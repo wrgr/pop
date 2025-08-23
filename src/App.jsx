@@ -66,6 +66,9 @@ export default function App() {
             <button className="btn" onClick={() => setRefsOpen(true)}>
               📚 References
             </button>
+            <a className="btn" href="help.html" target="_blank" rel="noopener">
+              ℹ️ Help
+            </a>
           </Card>
         </div>
       </main>

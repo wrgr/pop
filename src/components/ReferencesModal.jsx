@@ -14,6 +14,8 @@ return (
 <li><b>ρ</b> (air density): ~1.2 kg/m³ at sea level.</li>
 <li><b>σ</b> (surface tension): ~0.025–0.035 N/m typical for bubble mixes; higher → less deformation.</li>
 <li><b>R</b>: effective radius; from image scale or a fallback constant.</li>
+<li><b>μ<sub>air</sub></b>: dynamic viscosity of air (~1.8×10⁻⁵ Pa·s).</li>
+<li><b>μ<sub>film</sub></b>: bubble‑film viscosity (~1×10⁻³ Pa·s; affects drainage).</li>
 <li><b>τ</b> (relaxation time): ∝ μ_air·R/σ (capillary timescale) used in forward relaxation.</li>
 </ul>
 <hr/>
@@ -23,6 +25,7 @@ return (
 <li>Taylor, G. I. (1934); Grace, H. P. (1971+). Classical deformation parameter & shear‑flow analyses.</li>
 <li>Rao, R. et al. (2024). <i>Dynamics of soap bubble inflation.</i> Phys. Rev. Fluids 9:L051602.</li>
 <li>Chatzigiannakis, E. et al. (2021). <i>Thin liquid films: a review.</i> Curr. Opin. Colloid Interface Sci. 56:101461.</li>
+<li>Lide, D. R. (2004). <i>CRC Handbook of Chemistry and Physics.</i> (Air viscosity tables.)</li>
 </ul>
 <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
 <button className="btn" onClick={onClose}>Close</button>
