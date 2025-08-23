@@ -12,6 +12,18 @@ arbitrary bubble shapes. The implementation follows standard mesh lofting
 techniques【F:src/lib/geometry.js†L1-L45】 and is inspired by classical soap film
 modeling【F:src/lib/geometry.js†L5-L8】.
 
+## Minimal example
+
+Run a tiny script exercising the wand model and the forward/inverse bubble
+surrogates without launching the UI:
+
+```bash
+node examples/minimal.js
+```
+
+This generates a circular wand, sweeps it in a small breeze, and round‑trips
+the deformation mapping.
+
 
 ## Install & run
 ```bash
