@@ -1,36 +1,132 @@
-import React from 'react'
+import React, { memo } from 'react'
 
+const ReferencesModal = memo(function ReferencesModal({ onClose }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>📖 How to Use POP</h2>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        
+        <div className="modal-body">
+          <div className="stack">
+            <div className="card">
+              <h3>🔍 Inverse Analysis: Photo/Video → Wind & Wand</h3>
+              <div className="stack small">
+                <h4>Single Photo Analysis:</h4>
+                <ol>
+                  <li><strong>Upload:</strong> Choose a clear bubble photo</li>
+                  <li><strong>Draw:</strong> Drag on canvas to fit ellipse around bubble</li>
+                  <li><strong>Scale:</strong> Use 📏 to set real-world scale (cm)</li>
+                  <li><strong>Analyze:</strong> Click 🔍 to get wind speed, direction, and confidence</li>
+                </ol>
+                
+                <h4>Video Analysis:</h4>
+                <ol>
+                  <li><strong>Upload:</strong> Choose bubble video</li>
+                  <li><strong>Frame by Frame:</strong> Draw ellipses on key frames</li>
+                  <li><strong>Build Sequence:</strong> Use ➕ to add frames to analysis</li>
+                  <li><strong>Solve:</strong> Click 🔍 to separate wand motion from ambient wind</li>
+                </ol>
+              </div>
+            </div>
 
-export default function ReferencesModal({onClose}){
-return (
-<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}} onClick={onClose}>
-<div style={{background:'#fff',padding:'20px',borderRadius:'12px',maxWidth:'720px',maxHeight:'80%',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
-<h3>Scientific References & Parameter Meanings</h3>
-<p><b>Deformation parameter.</b> <span className="eq">D = (L − B)/(L + B)</span> using projected ellipse diameters; standard in the Taylor/Grace tradition for small‑to‑moderate deformations.</p>
-<p><b>Weber number.</b> <span className="eq">We = ρ U² R / σ</span> compares inertial to capillary stresses.</p>
-<p><b>Axis‑ratio ↔ We correlation (used here).</b> <span className="eq">χ(We)=1 + c₁·We/(1 + c₂·We)</span>, χ=a/b, with <code>c₁</code> (slope) and <code>c₂</code> (saturation). This captures the monotone trend summarized by Loth (2008) for bubbles/drops in uniform flow; you may replace it with a literature exact fit.</p>
-<ul>
-<li><b>c1, c2</b>: dimensionless shape‑sensitivity constants.</li>
-<li><b>ρ</b> (air density): ~1.2 kg/m³ at sea level.</li>
-<li><b>σ</b> (surface tension): ~0.025–0.035 N/m typical for bubble mixes; higher → less deformation.</li>
-<li><b>R</b>: effective radius; from image scale or a fallback constant.</li>
-<li><b>μ<sub>air</sub></b>: dynamic viscosity of air (~1.8×10⁻⁵ Pa·s).</li>
-<li><b>μ<sub>film</sub></b>: bubble‑film viscosity (~1×10⁻³ Pa·s; affects drainage).</li>
-<li><b>τ</b> (relaxation time): ∝ μ_air·R/σ (capillary timescale) used in forward relaxation.</li>
-</ul>
-<hr/>
-<h4>Primary citations</h4>
-<ul>
-<li>Loth, E. (2008). <i>Quasi‑steady shape and drag of deformable bubbles and drops.</i> Int. J. Multiphase Flow 34(6), 523‑546.</li>
-<li>Taylor, G. I. (1934); Grace, H. P. (1971+). Classical deformation parameter & shear‑flow analyses.</li>
-<li>Rao, R. et al. (2024). <i>Dynamics of soap bubble inflation.</i> Phys. Rev. Fluids 9:L051602.</li>
-<li>Chatzigiannakis, E. et al. (2021). <i>Thin liquid films: a review.</i> Curr. Opin. Colloid Interface Sci. 56:101461.</li>
-<li>Lide, D. R. (2004). <i>CRC Handbook of Chemistry and Physics.</i> (Air viscosity tables.)</li>
-</ul>
-<div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
-<button className="btn" onClick={onClose}>Close</button>
-</div>
-</div>
-</div>
-)
-}
+            <div className="card">
+              <h3>🔮 Forward Prediction: Wind & Wand → Bubble</h3>
+              <div className="stack small">
+                <h4>Wind Parameters:</h4>
+                <ul>
+                  <li><strong>Wind Speed:</strong> Adjust U slider (0-10 m/s)</li>
+                  <li><strong>Launch Jerk:</strong> Control detachment stretch (0-1)</li>
+                  <li><strong>Bubble Radius:</strong> Set expected size (5-80 cm)</li>
+                </ul>
+                
+                <h4>Bubble Solution:</h4>
+                <ul>
+                  <li><strong>Surface Tension:</strong> Adjust σ for soap concentration</li>
+                  <li><strong>Air Density:</strong> Modify ρ for altitude/temperature</li>
+                  <li><strong>Viscosity:</strong> Set μ for humidity effects</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="card">
+              <h3>🎨 Wand & String Editor</h3>
+              <div className="stack small">
+                <h4>Wand Setup:</h4>
+                <ul>
+                  <li><strong>Two Rods:</strong> Red handles represent wand positions</li>
+                  <li><strong>Drag Wands:</strong> Click and drag red handles to position</li>
+                  <li><strong>String Loop:</strong> Blue points form the bubble-forming loop</li>
+                </ul>
+                
+                <h4>String Control:</h4>
+                <ul>
+                  <li><strong>Add Points:</strong> Use ➕ to increase loop complexity</li>
+                  <li><strong>Remove Points:</strong> Use ➖ to simplify loop</li>
+                  <li><strong>Shape Loop:</strong> Drag blue points to desired shape</li>
+                  <li><strong>Reset:</strong> Use 🔁 to return to default setup</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="card">
+              <h3>🧪 Scientific Foundation</h3>
+              <div className="stack small">
+                <h4>Key Concepts:</h4>
+                <ul>
+                  <li><strong>Weber Number:</strong> Links inertial forces to surface tension</li>
+                  <li><strong>Deformation Parameter:</strong> D = (a-b)/(a+b) quantifies elongation</li>
+                  <li><strong>Empirical Surrogate Law:</strong> D ≈ k₁We/(1 + k₂We) from Loth (2008)</li>
+                  <li><strong>Bidirectional Inference:</strong> Forward and inverse calculations</li>
+                </ul>
+                
+                <h4>Physical Validation:</h4>
+                <ul>
+                  <li><strong>Dimensionless Groups:</strong> We, Re, Oh respect fundamental physics</li>
+                  <li><strong>Relaxation Dynamics:</strong> τ·dD/dt + D = Φ(We) models evolution</li>
+                  <li><strong>Confidence Assessment:</strong> Uncertainty quantification for predictions</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="card">
+              <h3>💡 Tips for Best Results</h3>
+              <div className="stack small">
+                <ul>
+                  <li><strong>Clear Images:</strong> Use high-contrast photos with minimal background</li>
+                  <li><strong>Accurate Ellipse:</strong> Fit the bubble outline precisely</li>
+                  <li><strong>Proper Scale:</strong> Use known reference distances for accurate results</li>
+                  <li><strong>Multiple Frames:</strong> More video frames improve wind/wand separation</li>
+                  <li><strong>Solution Properties:</strong> Adjust soap concentration and temperature for your mix</li>
+                  <li><strong>Wand Geometry:</strong> Realistic wand separation improves predictions</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="card">
+              <h3>⚠️ Limitations & Considerations</h3>
+              <div className="stack small">
+                <ul>
+                  <li><strong>Single Photo:</strong> Cannot separate wand motion from ambient wind</li>
+                  <li><strong>Empirical Model:</strong> Accuracy depends on calibration with your setup</li>
+                  <li><strong>Bubble Size:</strong> Works best for bubbles 5-80 cm diameter</li>
+                  <li><strong>Wind Range:</strong> Optimal for 0.5-8 m/s wind speeds</li>
+                  <li><strong>Solution Age:</strong> Fresh soap solutions give most consistent results</li>
+                  <li><strong>Environmental Factors:</strong> Temperature and humidity affect surface tension</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="modal-footer">
+          <button className="btn" onClick={onClose}>Got it!</button>
+        </div>
+      </div>
+    </div>
+  )
+})
+
+export default ReferencesModal

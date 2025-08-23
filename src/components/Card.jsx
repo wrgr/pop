@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { memo } from 'react'
 
-export default function Card({ title, bodyClassName = '', children }) {
+const Card = memo(function Card({ title, bodyClassName = '', children }) {
   return (
     <section className="card">
       {title && <h2>{title}</h2>}
@@ -9,4 +9,6 @@ export default function Card({ title, bodyClassName = '', children }) {
       </div>
     </section>
   )
-}
+})
+
+export default Card
