@@ -1,20 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react'
+import WandEditor from './WandEditor'
+import { computeMouthStats, swayPoints } from '../lib/physics.js'
 
-// Simplified simulator that sketches an ellipse representing the bubble.
-// The original file was truncated which left top-level returns and missing
-// component structure. This version restores a functional React component
-// so the app can run again.
+// Simplified simulator that sketches an ellipse representing the bubble and
+// shows how a wand string defined by control points sways in the wind.
 
 export default function Simulator() {
   const [params, setParams] = useState({
     U: 0,
-    dir: 0,
     jerk: 0,
     Rcm: 20,
     sigma: 0.03,
   })
   const canvasRef = useRef(null)
   const [metrics, setMetrics] = useState(null)
+  const [wand, setWand] = useState([])
+  const [t, setT] = useState(0)
+
+  // simple animation timer for wand sway
+  useEffect(() => {
+    const id = setInterval(() => setT((v) => v + 0.016), 16)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     const { c1 = 1, c2 = 0.3, rho = 1.2, mu = 1.8e-5 } =
@@ -22,6 +29,20 @@ export default function Simulator() {
     const c = canvasRef.current
     const ctx = c.getContext('2d')
     ctx.clearRect(0, 0, c.width, c.height)
+
+    // draw swaying wand
+    const swayed = swayPoints(wand, params.U, t)
+    ctx.strokeStyle = '#5b6bff'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    if (swayed.length) {
+      ctx.moveTo(swayed[0].x, swayed[0].y)
+      for (let i = 1; i < swayed.length; i++) ctx.lineTo(swayed[i].x, swayed[i].y)
+    }
+    ctx.stroke()
+
+    const stats = computeMouthStats(swayed)
+
     const R = params.Rcm / 100
     const We = (rho * params.U * params.U * R) / params.sigma
     const chi = 1 + (c1 * We) / (1 + c2 * We)
@@ -30,7 +51,7 @@ export default function Simulator() {
     const b = R * 100 * (1 / stretch)
     ctx.save()
     ctx.translate(c.width / 2, c.height / 2)
-    ctx.rotate((-params.dir * Math.PI) / 180)
+    ctx.rotate(stats.angle)
     ctx.strokeStyle = '#3ad1c9'
     ctx.lineWidth = 2
     ctx.beginPath()
@@ -38,8 +59,8 @@ export default function Simulator() {
     ctx.stroke()
     ctx.restore()
     const tau = (mu * R) / params.sigma
-    setMetrics({ We, chi, tau })
-  }, [params])
+    setMetrics({ We, chi, tau, mouth: stats })
+  }, [params, wand, t])
 
   const ui = (k, v) => setParams((p) => ({ ...p, [k]: v }))
 
@@ -57,18 +78,6 @@ export default function Simulator() {
             onChange={(e) => ui('U', parseFloat(e.target.value))}
           />{' '}
           {params.U.toFixed(1)} m/s
-        </label>
-        <label className="pill" title="Wind direction">
-          🧭 Dir
-          <input
-            type="range"
-            min="0"
-            max="360"
-            step="1"
-            value={params.dir}
-            onChange={(e) => ui('dir', parseFloat(e.target.value))}
-          />{' '}
-          {params.dir}°
         </label>
         <label className="pill" title="Launch stretch/jerk">
           🪄 Jerk
@@ -110,6 +119,7 @@ export default function Simulator() {
       <div className="sim-wrap">
         <canvas ref={canvasRef} width={720} height={360}></canvas>
       </div>
+      <WandEditor points={wand} onChange={setWand} />
       {metrics && (
         <div className="kv">
           <div className="label">Weber (We)</div>
@@ -118,6 +128,8 @@ export default function Simulator() {
           <div>{metrics.chi.toFixed(2)}</div>
           <div className="label">Relax time τ</div>
           <div>{metrics.tau.toFixed(2)} s</div>
+          <div className="label">Mouth angle</div>
+          <div>{(metrics.mouth.angle * 180 / Math.PI).toFixed(1)}°</div>
         </div>
       )}
     </div>
