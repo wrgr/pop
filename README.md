@@ -5,6 +5,13 @@ A static, client‑side bubble lab: upload a photo to estimate **wind** (directi
 
 See `help.html` for an extended guide to parameters and operation.
 
+## 3‑D geometry support
+The playground now includes a lightweight surface engine that lofts the moving
+wand loops into a triangular mesh, allowing forward and inverse reasoning on
+arbitrary bubble shapes. The implementation follows standard mesh lofting
+techniques【F:src/lib/geometry.js†L1-L45】 and is inspired by classical soap film
+modeling【F:src/lib/geometry.js†L5-L8】.
+
 
 ## Install & run
 ```bash
