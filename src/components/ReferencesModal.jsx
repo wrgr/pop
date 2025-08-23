@@ -12,8 +12,10 @@ return (
 <ul>
 <li><b>c1, c2</b>: dimensionless shape‑sensitivity constants.</li>
 <li><b>ρ</b> (air density): ~1.2 kg/m³ at sea level.</li>
+<li><b>μ</b> (air viscosity): ~1.8×10⁻⁵ Pa·s.</li>
 <li><b>σ</b> (surface tension): ~0.025–0.035 N/m typical for bubble mixes; higher → less deformation.</li>
 <li><b>R</b>: effective radius; from image scale or a fallback constant.</li>
+<li><b>g</b>: gravitational acceleration ~9.81 m/s².</li>
 <li><b>τ</b> (relaxation time): ∝ μ_air·R/σ (capillary timescale) used in forward relaxation.</li>
 </ul>
 <hr/>
@@ -23,6 +25,8 @@ return (
 <li>Taylor, G. I. (1934); Grace, H. P. (1971+). Classical deformation parameter & shear‑flow analyses.</li>
 <li>Rao, R. et al. (2024). <i>Dynamics of soap bubble inflation.</i> Phys. Rev. Fluids 9:L051602.</li>
 <li>Chatzigiannakis, E. et al. (2021). <i>Thin liquid films: a review.</i> Curr. Opin. Colloid Interface Sci. 56:101461.</li>
+<li>White, F. M. (2011). <i>Fluid Mechanics</i> (7th ed.). (Air viscosity.)</li>
+<li>NIST (2019). <i>CODATA recommended values of the fundamental constants</i>. (Standard gravity.)</li>
 </ul>
 <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
 <button className="btn" onClick={onClose}>Close</button>

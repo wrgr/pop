@@ -3,10 +3,12 @@ import Analyzer from './components/Analyzer.jsx'
 import Simulator from './components/Simulator.jsx'
 import ReferencesModal from './components/ReferencesModal.jsx'
 import CorrelationPanel from './components/CorrelationPanel.jsx'
+import HelpModal from './components/HelpModal.jsx'
 import logo from './images/logo.jpg'
 
 export default function App() {
   const [refsOpen, setRefsOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   return (
     <>
       <header>
@@ -19,6 +21,9 @@ export default function App() {
               predict how the wind was blowing or the wands were held during
               bubble launch?
             </div>
+            <button className="btn" onClick={() => setHelpOpen(true)}>
+              Help
+            </button>
           </div>
         </div>
       </header>
@@ -80,6 +85,7 @@ export default function App() {
         </div>
       </main>
       {refsOpen && <ReferencesModal onClose={() => setRefsOpen(false)} />}
+      {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
     </>
   )
 }

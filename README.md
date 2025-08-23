@@ -21,6 +21,8 @@ where **χ = a/b** (projected ellipse axis ratio). This captures the monotone tr
 - **Deformation parameter**: **D = (L − B) / (L + B)** (Taylor/Grace tradition) using major/minor diameters of the fitted ellipse.
 - **Relaxation time**: order‑of‑magnitude capillary scaling **τ ~ μ_air R / σ** (used for forward relaxation toward spherical when wind decreases).
 - **Film drainage** (optional lifetime gauge): canonical thin‑film scaling **∂h/∂t ∝ −h³/(μ R²)**.
+- **Air viscosity**: **μ_air ≈ 1.8×10⁻⁵ Pa·s** around 20 °C (White, 2011).
+- **Gravity**: **g ≈ 9.81 m/s²** (CODATA/NIST, 2019).
 
 
 ### Citations
@@ -28,6 +30,8 @@ where **χ = a/b** (projected ellipse axis ratio). This captures the monotone tr
 - Taylor, G. I. (1934); Grace, H. P. (1971+). (Deformation parameter & shear‑flow droplet deformation framing.)
 - Rao, R. et al. (2024). *Dynamics of soap bubble inflation.* **Phys. Rev. Fluids** 9:L051602. (Launch/inflation context.)
 - Chatzigiannakis, E. et al. (2021). *Thin liquid films: a review.* **Curr. Opin. Colloid Interface Sci.** 56:101461. (Drainage scaling.)
+- White, F. M. (2011). *Fluid Mechanics* (7th ed.). (Air viscosity.)
+- NIST (2019). *CODATA recommended values of the fundamental constants.* (Standard gravity.)
 
 
 > This app is educational. For high‑accuracy inference, calibrate with a local anemometer and your exact solution surface tension.
