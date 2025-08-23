@@ -6,9 +6,9 @@ return (
 <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}} onClick={onClose}>
 <div style={{background:'#fff',padding:'20px',borderRadius:'12px',maxWidth:'720px',maxHeight:'80%',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
 <h3>Scientific References & Parameter Meanings</h3>
-<p><b>Deformation parameter.</b> <code>D=(L−B)/(L+B)</code> using projected ellipse diameters; standard in the Taylor/Grace tradition for small‑to‑moderate deformations.</p>
-<p><b>Weber number.</b> <code>We = ρ U² R / σ</code> compares inertial to capillary stresses.</p>
-<p><b>Axis‑ratio ↔ We correlation (used here).</b> <code>χ(We)=1 + c1·We/(1 + c2·We)</code>, χ=a/b, with <code>c1</code> (slope) and <code>c2</code> (saturation). This captures the monotone trend summarized by Loth (2008) for bubbles/drops in uniform flow; you may replace it with a literature exact fit.</p>
+<p><b>Deformation parameter.</b> <span className="eq">D = (L − B)/(L + B)</span> using projected ellipse diameters; standard in the Taylor/Grace tradition for small‑to‑moderate deformations.</p>
+<p><b>Weber number.</b> <span className="eq">We = ρ U² R / σ</span> compares inertial to capillary stresses.</p>
+<p><b>Axis‑ratio ↔ We correlation (used here).</b> <span className="eq">χ(We)=1 + c₁·We/(1 + c₂·We)</span>, χ=a/b, with <code>c₁</code> (slope) and <code>c₂</code> (saturation). This captures the monotone trend summarized by Loth (2008) for bubbles/drops in uniform flow; you may replace it with a literature exact fit.</p>
 <ul>
 <li><b>c1, c2</b>: dimensionless shape‑sensitivity constants.</li>
 <li><b>ρ</b> (air density): ~1.2 kg/m³ at sea level.</li>

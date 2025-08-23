@@ -157,7 +157,7 @@ export default function Analyzer() {
   return (
     <div className="stack">
       <div className="controls" style={{ gap: 12 }}>
-        <label className="btn">
+        <label className="btn" title="Upload a bubble photo or video">
           <input
             ref={fileRef}
             type="file"
@@ -166,16 +166,38 @@ export default function Analyzer() {
           />
           <span>📎 Choose photo/video</span>
         </label>
-        <button className="btn" onClick={analyze} disabled={!ellipse}>
+        <button
+          className="btn"
+          onClick={analyze}
+          disabled={!ellipse}
+          title="Estimate wind from the drawn ellipse"
+        >
           🔍 Analyze
         </button>
-        <button className="btn" onClick={startScalePick}>
+        <button
+          className="btn"
+          onClick={startScalePick}
+          title="Click two points with known separation to set scale"
+        >
           📏 Set scale
         </button>
         <span className="badge">
           Vision: {window.__cvReady ? 'OpenCV.js ready' : 'manual'}
         </span>
       </div>
+      {!img && (
+        <div className="notice small">
+          Upload an image then drag on the canvas to outline the bubble.
+        </div>
+      )}
+      {img && !ellipse && (
+        <div className="notice small">
+          Drag on the bubble to fit an ellipse. Use 📏 to set scale.
+        </div>
+      )}
+      {ellipse && !report && (
+        <div className="notice small">Hit Analyze to see wind results.</div>
+      )}
       <canvas
         ref={canvasRef}
         width={720}

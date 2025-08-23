@@ -14,18 +14,29 @@ export default function Simulator() {
     sigma: 0.03,
   })
   const canvasRef = useRef(null)
+  const [metrics, setMetrics] = useState(null)
 
   useEffect(() => {
+    const { c1 = 1, c2 = 0.3, rho = 1.2 } = window.POP_PARAMS || {}
     const c = canvasRef.current
     const ctx = c.getContext('2d')
     ctx.clearRect(0, 0, c.width, c.height)
+    const R = params.Rcm / 100
+    const We = (rho * params.U * params.U * R) / params.sigma
+    const chi = 1 + (c1 * We) / (1 + c2 * We)
+    const stretch = 1 + params.jerk
+    const a = R * 100 * chi * stretch
+    const b = R * 100 * (1 / stretch)
+    ctx.save()
+    ctx.translate(c.width / 2, c.height / 2)
+    ctx.rotate((-params.dir * Math.PI) / 180)
     ctx.strokeStyle = '#3ad1c9'
     ctx.lineWidth = 2
     ctx.beginPath()
-    const a = params.Rcm * 2
-    const b = params.Rcm * 2 * (1 - params.jerk * 0.5)
-    ctx.ellipse(c.width / 2, c.height / 2, a, b, 0, 0, Math.PI * 2)
+    ctx.ellipse(0, 0, a, b, 0, 0, Math.PI * 2)
     ctx.stroke()
+    ctx.restore()
+    setMetrics({ We, chi })
   }, [params])
 
   const ui = (k, v) => setParams((p) => ({ ...p, [k]: v }))
@@ -33,7 +44,7 @@ export default function Simulator() {
   return (
     <div className="stack">
       <div className="controls" style={{ gap: 16 }}>
-        <label className="pill">
+        <label className="pill" title="Wind speed (m/s)">
           🌬️ U
           <input
             type="range"
@@ -45,7 +56,7 @@ export default function Simulator() {
           />{' '}
           {params.U.toFixed(1)} m/s
         </label>
-        <label className="pill">
+        <label className="pill" title="Wind direction">
           🧭 Dir
           <input
             type="range"
@@ -57,7 +68,7 @@ export default function Simulator() {
           />{' '}
           {params.dir}°
         </label>
-        <label className="pill">
+        <label className="pill" title="Launch stretch/jerk">
           🪄 Jerk
           <input
             type="range"
@@ -69,7 +80,7 @@ export default function Simulator() {
           />{' '}
           {params.jerk.toFixed(2)}
         </label>
-        <label className="pill">
+        <label className="pill" title="Bubble radius (cm)">
           ⚪ Ø
           <input
             type="range"
@@ -81,7 +92,7 @@ export default function Simulator() {
           />{' '}
           {params.Rcm} cm
         </label>
-        <label className="pill">
+        <label className="pill" title="Surface tension (N/m)">
           σ
           <input
             type="range"
@@ -97,6 +108,14 @@ export default function Simulator() {
       <div className="sim-wrap">
         <canvas ref={canvasRef} width={720} height={360}></canvas>
       </div>
+      {metrics && (
+        <div className="kv">
+          <div className="label">Weber (We)</div>
+          <div>{metrics.We.toFixed(2)}</div>
+          <div className="label">Axis ratio χ</div>
+          <div>{metrics.chi.toFixed(2)}</div>
+        </div>
+      )}
     </div>
   )
 }
