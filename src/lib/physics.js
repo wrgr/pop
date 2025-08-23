@@ -1,25 +1,37 @@
-// Lightweight forward model: ellipsoid evolves under wind forcing (via We) and relaxes toward sphere.
+// Lightweight forward model: ellipsoid evolves under wind forcing (via We)
+// and relaxes toward a sphere. The original file was accidentally truncated
+// leaving the statements below at top level and causing a SyntaxError. The
+// dynamics are now wrapped in an exported function `step` so callers can
+// advance the bubble state safely.
 
+import { deformationD } from './inference.js'
 
-// relax (a,b) toward targets with tau, plus relax toward sphere when U small
-const tau = Math.max(0.05, cal.tau)
-const g = cal.shearGain
-const a = state.a + ( (aTarget - state.a)*g )*dt/tau + (R - state.a)*(1-g)*dt/tau
-const b = state.b + ( (bTarget - state.b)*g )*dt/tau + (R - state.b)*(1-g)*dt/tau
+/**
+ * Advance the bubble state by a timestep.
+ * @param {object} state - Current state {a,b,x,y} in pixels.
+ * @param {number} dt    - Timestep in seconds.
+ * @param {object} cal   - Calibration/forcing terms.
+ *   Requires {U, dir, aTarget, bTarget, R, tau, shearGain}.
+ */
+export function step(state, dt, cal){
+  const { U=0, dir=0, aTarget=state.a, bTarget=state.b, R=state.a, tau=0.1, shearGain=1 } = cal
 
+  // relax (a,b) toward targets with tau, plus relax toward sphere when U small
+  const g = shearGain
+  const a = state.a + ((aTarget - state.a) * g) * dt / tau + (R - state.a) * (1 - g) * dt / tau
+  const b = state.b + ((bTarget - state.b) * g) * dt / tau + (R - state.b) * (1 - g) * dt / tau
 
-// move bubble with wind (simple drift)
-const speedPx = U * 40 // scale for demo
-const ang = dir*Math.PI/180
-const x = (state.x ?? 100) + Math.cos(ang)*speedPx*dt
-const y = (state.y ?? 200) - Math.sin(ang)*speedPx*dt
+  // move bubble with wind (simple drift)
+  const speedPx = U * 40 // scale for demo
+  const ang = dir * Math.PI / 180
+  const x = (state.x ?? 100) + Math.cos(ang) * speedPx * dt
+  const y = (state.y ?? 200) - Math.sin(ang) * speedPx * dt
 
-
-const axisRatio = Math.max(1e-6, a/b)
-const D = deformationD(a,b)
-const next = { a, b, ang: ang, x, y }
-const metrics = { axisRatio, D }
-return { state: next, metrics }
+  const axisRatio = Math.max(1e-6, a / b)
+  const D = deformationD(a, b)
+  const next = { a, b, ang, x, y }
+  const metrics = { axisRatio, D }
+  return { state: next, metrics }
 }
 
 
