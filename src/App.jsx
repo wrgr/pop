@@ -3,6 +3,7 @@ import Analyzer from './components/Analyzer.jsx'
 import Simulator from './components/Simulator.jsx'
 import ReferencesModal from './components/ReferencesModal.jsx'
 import CorrelationPanel from './components/CorrelationPanel.jsx'
+import logo from './images/logo.jpg'
 
 export default function App() {
   const [refsOpen, setRefsOpen] = useState(false)
@@ -10,7 +11,7 @@ export default function App() {
     <>
       <header>
         <div className="wrap title">
-          <div className="bubble" aria-hidden="true" />
+          <img src={logo} alt="POP logo" className="logo" />
           <div>
             <h1>POP — Phil's Orb Playground</h1>
             <div className="subtitle">
