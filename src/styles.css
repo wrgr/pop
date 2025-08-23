@@ -1,4 +1,5 @@
-:root{ --bg1:#e8f7ff; --bg2:#fff6fb; --ink:#123; --ink2:#345; --accent:#6c7bff; --accent2:#3ad1c9; --good:#32c671; --warn:#ffb020; --bad:#ff6b6b }
+/* Playful palette pulled from the new POP logo */
+:root{ --bg1:#e6f9ff; --bg2:#ffeff8; --ink:#123; --ink2:#345; --accent:#ff7abc; --accent2:#70d6ff; --good:#32c671; --warn:#ffb020; --bad:#ff6b6b }
 *{ box-sizing:border-box }
 html,body,#root{ height:100%; margin:0 }
 body{ font-family:Poppins,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
@@ -6,22 +7,20 @@ background: radial-gradient(1200px 800px at 10% 0%, var(--bg2), transparent), ra
 header{ position:sticky; top:0; backdrop-filter:saturate(1.1) blur(6px); background:rgba(255,255,255,.7); border-bottom:1px solid #e9eef5; z-index:10 }
 .wrap{ max-width:1140px; margin:0 auto; padding:14px 18px }
 .title{ display:flex; align-items:center; gap:14px }
-.bubble{ width:42px; height:42px; border-radius:50%; background: radial-gradient(circle at 25% 25%, rgba(255,255,255,.9), rgba(255,255,255,.3) 35%, rgba(255,255,255,.1) 45%, rgba(58,209,201,.25) 60%, rgba(108,123,255,.25) 80%, rgba(255,255,255,.3) 100%);
-box-shadow: 0 6px 18px rgba(0,0,0,.08), inset 0 0 16px rgba(255,255,255,.7); animation: float 5s ease-in-out infinite }
-@keyframes float{0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)}}
+.logo{ width:48px; height:48px; border-radius:50%; object-fit:cover; box-shadow:0 4px 10px rgba(0,0,0,.1) }
 h1{font-weight:800; letter-spacing:.2px; margin:0; font-size:1.6rem}
 .subtitle{color:var(--ink2); font-weight:400}
 main{max-width:1140px; margin:20px auto; padding:0 18px 44px}
 .grid{display:grid; grid-template-columns: 1fr; gap:18px}
 @media(min-width:980px){.grid{grid-template-columns: 1.2fr .8fr}}
 .card{background:#fff; border:1px solid #e8eef5; border-radius:16px; box-shadow:0 8px 24px rgba(18,34,51,.05); overflow:hidden}
-.card h2{margin:0; padding:14px 16px; background:linear-gradient(90deg, rgba(108,123,255,.12), rgba(58,209,201,.12)); border-bottom:1px solid #e8eef5; font-size:1.1rem}
+.card h2{margin:0; padding:14px 16px; background:linear-gradient(90deg, rgba(255,122,188,.15), rgba(112,214,255,.15)); border-bottom:1px solid #e8eef5; font-size:1.1rem}
 .card .body{padding:14px 16px}
 .controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
 .pill{background:#f4f7fb; border:1px solid #e3eaf3; padding:8px 12px; border-radius:999px; display:inline-flex; gap:8px; align-items:center}
 input[type="file"]{display:none}
 .btn{display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; border:1px solid #dfe7f2; background:linear-gradient(180deg,#fff, #f6f9ff); cursor:pointer; font-weight:600}
-.btn.primary{background:linear-gradient(180deg,#6c7bff,#3ad1c9); color:white; border:none}
+.btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent2)); color:white; border:none}
 .btn.ghost{background:#fff}
 .stack{display:flex; flex-direction:column; gap:10px}
 .row{display:flex; gap:10px; align-items:center}
