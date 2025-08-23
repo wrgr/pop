@@ -1,10 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
+import Bubble3D from './Bubble3D.jsx'
+import WandEditor from './WandEditor.jsx'
 
-// Simplified simulator that sketches an ellipse representing the bubble.
-// The original file was truncated which left top-level returns and missing
-// component structure. This version restores a functional React component
-// so the app can run again.
-
+// Simulator sketches both a 2‑D ellipse and a simple 3‑D ellipsoid
 export default function Simulator() {
   const [params, setParams] = useState({
     U: 0,
@@ -15,6 +13,8 @@ export default function Simulator() {
   })
   const canvasRef = useRef(null)
   const [metrics, setMetrics] = useState(null)
+  const [axes, setAxes] = useState({ a: 0, b: 0 })
+  const [wandPts, setWandPts] = useState([])
 
   useEffect(() => {
     const { c1 = 1, c2 = 0.3, rho = 1.2, mu = 1.8e-5 } =
@@ -28,6 +28,7 @@ export default function Simulator() {
     const stretch = 1 + params.jerk
     const a = R * 100 * chi * stretch
     const b = R * 100 * (1 / stretch)
+    setAxes({ a, b })
     ctx.save()
     ctx.translate(c.width / 2, c.height / 2)
     ctx.rotate((-params.dir * Math.PI) / 180)
@@ -110,6 +111,8 @@ export default function Simulator() {
       <div className="sim-wrap">
         <canvas ref={canvasRef} width={720} height={360}></canvas>
       </div>
+      <Bubble3D a={axes.a} b={axes.b} dir={params.dir} />
+      <WandEditor points={wandPts} onChange={setWandPts} />
       {metrics && (
         <div className="kv">
           <div className="label">Weber (We)</div>
