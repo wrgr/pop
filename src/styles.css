@@ -35,3 +35,6 @@ canvas, video, img{max-width:100%; border-radius:12px; border:1px dashed #d7e2ef
 .badge{border:1px solid #e2e8f5; border-radius:999px; padding:4px 8px; background:#fff}
 .err{color:var(--bad)}
 .ok{color:var(--good)}
+
+code,.eq{background:#f4f7fb;padding:2px 4px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.eq{display:inline-block;margin:2px 0}
