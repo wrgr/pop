@@ -12,6 +12,7 @@ export default function Analyzer() {
   const [pickPts, setPickPts] = useState(null)
   const [report, setReport] = useState(null)
   const fileRef = useRef(null)
+  const rafRef = useRef(null)
 
   useEffect(() => {
     redraw()
@@ -77,9 +78,12 @@ export default function Analyzer() {
       const a = Math.max(5, Math.abs(dx))
       const b = Math.max(5, Math.abs(dy))
       const angleRad = Math.atan2(dy, dx)
-      setEllipse({ cx: start.x, cy: start.y, a, b, angleRad })
+      const next = { cx: start.x, cy: start.y, a, b, angleRad }
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(() => setEllipse(next))
     }
     function up() {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
       window.removeEventListener('mousemove', move)
       window.removeEventListener('mouseup', up)
     }
