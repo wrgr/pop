@@ -17,7 +17,8 @@ export default function Simulator() {
   const [metrics, setMetrics] = useState(null)
 
   useEffect(() => {
-    const { c1 = 1, c2 = 0.3, rho = 1.2 } = window.POP_PARAMS || {}
+    const { c1 = 1, c2 = 0.3, rho = 1.2, mu = 1.8e-5 } =
+      window.POP_PARAMS || {}
     const c = canvasRef.current
     const ctx = c.getContext('2d')
     ctx.clearRect(0, 0, c.width, c.height)
@@ -36,7 +37,8 @@ export default function Simulator() {
     ctx.ellipse(0, 0, a, b, 0, 0, Math.PI * 2)
     ctx.stroke()
     ctx.restore()
-    setMetrics({ We, chi })
+    const tau = (mu * R) / params.sigma
+    setMetrics({ We, chi, tau })
   }, [params])
 
   const ui = (k, v) => setParams((p) => ({ ...p, [k]: v }))
@@ -114,6 +116,8 @@ export default function Simulator() {
           <div>{metrics.We.toFixed(2)}</div>
           <div className="label">Axis ratio χ</div>
           <div>{metrics.chi.toFixed(2)}</div>
+          <div className="label">Relax time τ</div>
+          <div>{metrics.tau.toFixed(2)} s</div>
         </div>
       )}
     </div>

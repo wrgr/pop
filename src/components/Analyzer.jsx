@@ -113,8 +113,14 @@ export default function Analyzer() {
 
   function analyze() {
     if (!ellipse) return
-    const { c1 = 1, c2 = 0.3, rho = 1.2, sigma = 0.03, Rf = 0.2 } =
-      window.POP_PARAMS || {}
+    const {
+      c1 = 1,
+      c2 = 0.3,
+      rho = 1.2,
+      sigma = 0.03,
+      Rf = 0.2,
+      mu = 1.8e-5,
+    } = window.POP_PARAMS || {}
     const major = Math.max(ellipse.a, ellipse.b)
     const minor = Math.min(ellipse.a, ellipse.b)
     const axisRatio = major / minor
@@ -124,10 +130,12 @@ export default function Analyzer() {
       ? Math.sqrt(ellipse.a * ellipse.b) / scalePxPerCm / 100
       : Rf
     const U = Math.sqrt((We * sigma) / (rho * Rm))
+    const tau = (mu * Rm) / sigma
     const rep = {
       axisRatio: axisRatio.toFixed(2),
       D: D.toFixed(3),
       Rcm: scalePxPerCm ? Rm * 100 : null,
+      tau,
       wind: {
         We,
         U,
@@ -219,6 +227,8 @@ export default function Analyzer() {
           <div>
             {report.Rcm ? `${report.Rcm.toFixed(1)} cm` : '— (set scale for cm)'}
           </div>
+          <div className="label">Relax time τ</div>
+          <div>{report.tau.toFixed(2)} s</div>
           <div className="label">Wind class</div>
           <div>{report.wind.class}</div>
           <div className="label">Weber (We)</div>
