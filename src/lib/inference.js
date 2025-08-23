@@ -29,3 +29,11 @@ const Ulo = Math.max(0, U*0.7), Uhi = U*1.3 // crude ±30% band (user can calibr
 const cls = U<0.5? 'Calm' : U<2? 'Light breeze' : U<4? 'Moderate' : 'Gusty'
 return { U, Ulo, Uhi, cls, We }
 }
+
+export function mapUToAxisRatio(U, Rm){
+const { c1, c2, rho, sigma, Rf } = params()
+const R = Rm ?? Rf
+const We = rho * U * U * R / sigma
+const chi = 1 + (c1 * We) / (1 + c2 * We)
+return chi
+}
