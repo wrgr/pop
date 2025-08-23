@@ -1,5 +1,5 @@
 /* Playful palette pulled from the new POP logo */
-:root{ --bg1:#e6f9ff; --bg2:#ffeff8; --ink:#123; --ink2:#345; --accent:#ff7abc; --accent2:#70d6ff; --good:#32c671; --warn:#ffb020; --bad:#ff6b6b }
+:root{ --bg1:#e6f9ff; --bg2:#ffeff8; --ink:#123; --ink2:#345; --accent:#ff7abc; --accent2:#70d6ff; --good:#32c671; --warn:#ffb020; --bad:#ff6b6b; --rainbow:linear-gradient(90deg,#ff6b6b,#ffb020,#32c671,#70d6ff,#ff7abc) }
 *{ box-sizing:border-box }
 html,body,#root{ height:100%; margin:0 }
 body{ font-family:Poppins,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
@@ -13,14 +13,15 @@ h1{font-weight:800; letter-spacing:.2px; margin:0; font-size:1.6rem}
 main{max-width:1140px; margin:20px auto; padding:0 18px 44px}
 .grid{display:grid; grid-template-columns: 1fr; gap:18px}
 @media(min-width:980px){.grid{grid-template-columns: 1.2fr .8fr}}
-.card{background:#fff; border:1px solid #e8eef5; border-radius:16px; box-shadow:0 8px 24px rgba(18,34,51,.05); overflow:hidden}
-.card h2{margin:0; padding:14px 16px; background:linear-gradient(90deg, rgba(255,122,188,.15), rgba(112,214,255,.15)); border-bottom:1px solid #e8eef5; font-size:1.1rem}
-.card .body{padding:14px 16px}
+.card{position:relative;background:rgba(255,255,255,.8);backdrop-filter:blur(8px);border-radius:24px;border:2px solid transparent;background-image:linear-gradient(#fff,#fff),var(--rainbow);background-origin:border-box;background-clip:padding-box,border-box;box-shadow:0 10px 30px rgba(18,34,51,.08);overflow:hidden;transition:transform .2s,box-shadow .2s}
+.card:hover{transform:translateY(-4px);box-shadow:0 14px 40px rgba(18,34,51,.12)}
+.card h2{margin:0;padding:16px 20px;background:var(--rainbow);color:#fff;font-size:1.15rem}
+.card .body{padding:16px 20px}
 .controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
 .pill{background:#f4f7fb; border:1px solid #e3eaf3; padding:8px 12px; border-radius:999px; display:inline-flex; gap:8px; align-items:center}
 input[type="file"]{display:none}
 .btn{display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; border:1px solid #dfe7f2; background:linear-gradient(180deg,#fff, #f6f9ff); cursor:pointer; font-weight:600}
-.btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent2)); color:white; border:none}
+.btn.primary{background:var(--rainbow);color:#fff;border:none}
 .btn.ghost{background:#fff}
 .stack{display:flex; flex-direction:column; gap:10px}
 .row{display:flex; gap:10px; align-items:center}
