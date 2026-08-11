@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
-import { createBubble, step, measure, driftVelocity } from '../lib/engine.js'
+import { createBubble, step, measure, driftVelocity, launchGeometry } from '../lib/engine.js'
 import { weberFromDeformation } from '../lib/inference.js'
 
 // Calibration of *this* engine: the empirical Weber number recovered from the
@@ -48,6 +48,8 @@ const BubblePhysics = memo(function BubblePhysics() {
     kPressure: 90, // internal pressure
     bond: 0.8, // gravitational Bond number (gravity sag / teardrop)
     film: 1.0, // soap-film thickness (µm) — sets membrane inertia / ring rate
+    launcher: 'loop', // 'loop' (compliant string loop) or 'wand' (rigid hoop)
+    handleSep: 0.45, // string-loop handle separation (0 = round loop, 1 = long thin)
   })
   const [running, setRunning] = useState(true)
   const [showField, setShowField] = useState(true)
@@ -82,24 +84,37 @@ const BubblePhysics = memo(function BubblePhysics() {
   const launchBubble = useCallback(() => {
     const p = paramsRef.current
     const ang = (p.windDir * Math.PI) / 180
-    // Launch mostly along the wind, with a little upward pop off the wand.
+    // Launch mostly along the wind, with a little upward pop off the launcher.
     const v = p.launch * PX_PER_MS
+    // The launcher (rigid wand vs. compliant string loop) sets the bubble's
+    // birth size, elongation and tilt. The loop stamps its own shape on; the
+    // rigid wand hands off a clean round bubble.
+    const g = launchGeometry({
+      type: p.launcher,
+      R: p.R,
+      sep: p.handleSep,
+      tiltRad: 0, // handles held horizontally -> horizontal loop imprint
+      windPx: p.windSpeed * PX_PER_MS,
+    })
     stateRef.current = createBubble({
       cx: 190,
       cy: H / 2,
-      R: p.R,
+      R: g.R,
       n: 56,
       vx: Math.cos(ang) * v,
       vy: -Math.abs(Math.sin(ang) * v) - 60, // slight upward kick
-      // Pinch-off from the wand leaves the bubble born already deformed, so it
-      // rings (its Rayleigh–Lamb shape mode) as the film relaxes.
-      squash: 0.25 + 0.05 * p.launch,
+      squash: g.squash,
+      tilt: g.tilt,
     })
     tRef.current = 0
   }, [])
 
   // Seed a bubble on mount.
   useEffect(() => { launchBubble() }, [launchBubble])
+
+  // Re-launch when the launcher type changes so the contrast is immediate.
+  // (paramsRef is synced above, so launchBubble reads the new launcher.)
+  useEffect(() => { launchBubble() }, [params.launcher, launchBubble])
 
   const currentWind = useCallback((t) => {
     const p = paramsRef.current
@@ -149,18 +164,51 @@ const BubblePhysics = memo(function BubblePhysics() {
       }
     }
 
-    // The wand the bubble launched from.
-    ctx.strokeStyle = '#ff7abc'
-    ctx.lineWidth = 5
-    ctx.beginPath()
-    ctx.moveTo(150, H - 20)
-    ctx.lineTo(180, H / 2 + 30)
-    ctx.stroke()
-    ctx.strokeStyle = 'rgba(255,122,188,0.7)'
-    ctx.lineWidth = 3
-    ctx.beginPath()
-    ctx.ellipse(190, H / 2, 26, 34, -0.2, 0, Math.PI * 2)
-    ctx.stroke()
+    // The launcher the bubble came off — a rigid wand or a compliant string loop.
+    const Lx = 190
+    const Ly = H / 2
+    if (p.launcher === 'wand') {
+      // Rigid hoop on a stick: fixed circle, no sway, no billow.
+      ctx.strokeStyle = '#ff7abc'
+      ctx.lineWidth = 5
+      ctx.beginPath()
+      ctx.moveTo(150, H - 18)
+      ctx.lineTo(Lx - 14, Ly + 26)
+      ctx.stroke()
+      ctx.strokeStyle = 'rgba(255,122,188,0.9)'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.ellipse(Lx, Ly, 26, 28, 0, 0, Math.PI * 2)
+      ctx.stroke()
+    } else {
+      // String loop between two handles: sways, and the wind billows it open.
+      const windSign = wx >= 0 ? 1 : -1
+      const sway = Math.sin(t * 2.2) * 3 * (1 + p.windSpeed * 0.08)
+      const rx = 20 + 34 * p.handleSep // wider as the handles are pulled apart
+      const ry = 42 - 16 * p.handleSep
+      ctx.strokeStyle = 'rgba(91,107,255,0.85)'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      for (let k = 0; k <= 44; k++) {
+        const th = (k / 44) * Math.PI * 2
+        const facing = Math.cos(th) * windSign // +1 on the downwind side
+        const px = Lx + Math.cos(th) * rx + windSign * Math.max(0, facing) * (6 + p.windSpeed * 2.2)
+        const py = Ly + Math.sin(th) * ry + sway * Math.sin(th)
+        if (k === 0) ctx.moveTo(px, py)
+        else ctx.lineTo(px, py)
+      }
+      ctx.closePath()
+      ctx.stroke()
+      // Two handle dowels reaching up to the loop's sides.
+      ctx.strokeStyle = '#b5794a'
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.moveTo(146, H - 14)
+      ctx.lineTo(Lx - rx, Ly + sway)
+      ctx.moveTo(170, H - 14)
+      ctx.lineTo(Lx - rx * 0.15, Ly + ry * 0.92 + sway)
+      ctx.stroke()
+    }
 
     if (!state) return
     const nodes = state.nodes
@@ -275,6 +323,8 @@ const BubblePhysics = memo(function BubblePhysics() {
             driftMs: Math.hypot(drift.vx, drift.vy) / PX_PER_MS,
             bond: p.bond,
             film: p.film,
+            launcher: p.launcher,
+            age: state.age,
             popped: state.popped,
           })
         }
@@ -313,6 +363,36 @@ const BubblePhysics = memo(function BubblePhysics() {
           <input type="checkbox" checked={showField} onChange={(e) => setShowField(e.target.checked)} />
           🌬️ wind field
         </label>
+      </div>
+
+      <div className="controls" style={{ gap: 12 }}>
+        <div className="pill" style={{ gap: 8 }} title="What the bubble is launched from">
+          🧰 Launcher
+          <button
+            className={`btn small ${params.launcher === 'loop' ? 'primary' : 'ghost'}`}
+            onClick={() => set('launcher', 'loop')}
+          >
+            🪢 String loop
+          </button>
+          <button
+            className={`btn small ${params.launcher === 'wand' ? 'primary' : 'ghost'}`}
+            onClick={() => set('launcher', 'wand')}
+          >
+            ⭕ Rigid wand
+          </button>
+        </div>
+        {params.launcher === 'loop' && (
+          <label className="pill" title="Handle separation — pulls the loop into a long thin opening">
+            ↔️ Handles
+            <input type="range" min="0" max="1" step="0.05" value={params.handleSep}
+              onChange={(e) => set('handleSep', parseFloat(e.target.value))} /> {(params.handleSep * 100).toFixed(0)}%
+          </label>
+        )}
+        <span className="small" style={{ alignSelf: 'center', color: 'var(--ink2)' }}>
+          {params.launcher === 'loop'
+            ? 'A compliant loop stamps its own elongation on the bubble and the wind billows it open.'
+            : 'A rigid hoop hands off a clean round bubble — post-launch shape is pure wind.'}
+        </span>
       </div>
 
       <div className="controls" style={{ gap: 16 }}>
@@ -398,6 +478,21 @@ const BubblePhysics = memo(function BubblePhysics() {
             {readout.driftMs.toFixed(1)} m/s downwind — you set {readout.windSet.toFixed(1)} m/s, but
             the film only feels the wind <em>relative</em> to its own motion
           </div>
+          <div className="label">Launcher imprint</div>
+          <div>
+            {readout.launcher === 'loop' ? (
+              <>
+                <strong>String loop</strong> — the bubble was born elongated along the loop; that
+                imprint is {readout.age < 1.2 ? 'still ringing out' : 'ringing out'} as the shape
+                relaxes toward the wind-only form
+              </>
+            ) : (
+              <>
+                <strong>Rigid wand</strong> — born round, so the shape you measure is wind &amp;
+                gravity only, no launcher signature
+              </>
+            )}
+          </div>
           <div className="label">Gravity sag vs. wind (the confound)</div>
           <div>
             Bo = {readout.bond.toFixed(2)}
@@ -420,14 +515,15 @@ const BubblePhysics = memo(function BubblePhysics() {
       </div>
 
       <div className="notice small" style={{ margin: 0 }}>
-        <strong>Two extra physical parameters, added because they confound the inference:</strong>{' '}
+        <strong>Three physical parameters, added because they confound the inference:</strong>{' '}
         <strong>Gravity (Bond number)</strong> stretches a big bubble vertically with <em>no wind at
-        all</em> — the same ellipse a vertical wind would make, which the shape-to-wind map would
-        misread. <strong>Film thickness</strong> sets the
-        membrane's inertia, so a freshly pinched bubble <em>rings</em> (its Rayleigh–Lamb shape mode)
-        and a single frame can catch it mid-wobble. Both make the same point: from one silhouette,
-        wind, sag, and ringing are degenerate — you need time (video) or a reference to tell them
-        apart.
+        all</em> — the same ellipse a vertical wind would make. <strong>Film thickness</strong> sets
+        the membrane's inertia, so a freshly pinched bubble <em>rings</em> (its Rayleigh–Lamb shape
+        mode) and a single frame can catch it mid-wobble. And the <strong>launcher</strong> is the
+        other half of POP's question — a <em>string loop</em> stamps its own elongation onto the
+        bubble (and the wind billows it open), whereas a <em>rigid wand</em> hands off a clean round
+        start. All four cues — wind, sag, ringing, and how the wand was held — are degenerate in one
+        silhouette; you need time (video) or a reference to tell them apart.
       </div>
     </div>
   )

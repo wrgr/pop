@@ -1,6 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createBubble, step, measure, polygonArea, centroid, driftVelocity } from '../src/lib/engine.js'
+import {
+  createBubble,
+  step,
+  measure,
+  polygonArea,
+  centroid,
+  driftVelocity,
+  launchGeometry,
+} from '../src/lib/engine.js'
 
 function settle(state, seconds, p, dt = 1 / 120) {
   for (let t = 0; t < seconds; t += dt) step(state, dt, p)
@@ -140,4 +148,39 @@ test('a heavier film relaxes more slowly (higher inertia)', () => {
   const endLight = light[light.length - 1]
   const endHeavy = heavy[heavy.length - 1]
   assert.ok(endHeavy > endLight, `heavier film should still be deformed later: light=${endLight} heavy=${endHeavy}`)
+})
+
+// --- Launcher: string loop vs. rigid wand ---
+
+test('a rigid wand launches a round bubble at a fixed size, ignoring wind', () => {
+  const calm = launchGeometry({ type: 'wand', R: 70, sep: 0.8, windPx: 0 })
+  const gale = launchGeometry({ type: 'wand', R: 70, sep: 0.8, windPx: 400 })
+  // Rigid: size fixed by the hoop, opening does not billow with wind...
+  assert.equal(calm.R, 70)
+  assert.equal(gale.R, 70)
+  // ...handle separation is irrelevant, and the imprint is only the small pinch.
+  assert.ok(calm.squash < 0.2, `wand should birth a nearly round bubble: squash=${calm.squash}`)
+  assert.equal(calm.tilt, 0)
+})
+
+test('a string loop imprints elongation from handle separation', () => {
+  const round = launchGeometry({ type: 'loop', R: 70, sep: 0, windPx: 0 })
+  const stretched = launchGeometry({ type: 'loop', R: 70, sep: 1, windPx: 0 })
+  assert.ok(stretched.squash > round.squash + 0.5, `pulling handles apart should elongate: ${round.squash} -> ${stretched.squash}`)
+})
+
+test('wind billows a string loop open (bigger bubble), but never a rigid wand', () => {
+  const loopCalm = launchGeometry({ type: 'loop', R: 70, sep: 0.4, windPx: 0 })
+  const loopWind = launchGeometry({ type: 'loop', R: 70, sep: 0.4, windPx: 400 })
+  assert.ok(loopWind.R > loopCalm.R + 5, `wind should open the loop: ${loopCalm.R} -> ${loopWind.R}`)
+})
+
+test('createBubble tilt rotates the launcher imprint (major axis follows tilt)', () => {
+  const horiz = createBubble({ R: 70, n: 56, squash: 0.5, tilt: 0 })
+  const vert = createBubble({ R: 70, n: 56, squash: 0.5, tilt: Math.PI / 2 })
+  // A horizontal imprint has its major axis near 0°, a 90°-tilted one near ±90°.
+  assert.ok(Math.abs(measure(horiz).angle) < 0.15, `untilted imprint should be horizontal: ${measure(horiz).angle}`)
+  assert.ok(Math.abs(Math.abs(measure(vert).angle) - Math.PI / 2) < 0.15, `tilted imprint should be vertical: ${measure(vert).angle}`)
+  // Rotation preserves area.
+  assert.ok(Math.abs(Math.abs(polygonArea(vert.nodes)) - Math.abs(polygonArea(horiz.nodes))) < 1, 'tilt should preserve area')
 })

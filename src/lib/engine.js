@@ -34,19 +34,24 @@ const TWO_PI = Math.PI * 2
  * @param {number} opts.vx  Initial launch velocity x (px/s)
  * @param {number} opts.vy  Initial launch velocity y (px/s)
  */
-export function createBubble({ cx = 360, cy = 200, R = 70, n = 56, vx = 0, vy = 0, squash = 0 } = {}) {
+export function createBubble({ cx = 360, cy = 200, R = 70, n = 56, vx = 0, vy = 0, squash = 0, tilt = 0 } = {}) {
   // `squash` pre-deforms the ring into an ellipse: a real bubble pinches off the
-  // wand and is born already distorted, so with light damping it rings (its
+  // launcher and is born already distorted, so with light damping it rings (its
   // Rayleigh–Lamb shape mode) as it relaxes. Area is preserved (stretch one
-  // axis, shrink the other by the same factor).
+  // axis, shrink the other by the same factor). `tilt` (radians) rotates that
+  // initial ellipse, so a launcher can imprint an elongation at any angle.
   const sx = 1 + squash
   const sy = 1 / sx
+  const ct = Math.cos(tilt)
+  const st = Math.sin(tilt)
   const nodes = []
   for (let i = 0; i < n; i++) {
     const th = (i / n) * TWO_PI
+    const dx = Math.cos(th) * R * sx
+    const dy = Math.sin(th) * R * sy
     nodes.push({
-      x: cx + Math.cos(th) * R * sx,
-      y: cy + Math.sin(th) * R * sy,
+      x: cx + dx * ct - dy * st,
+      y: cy + dx * st + dy * ct,
       vx,
       vy,
     })
@@ -348,6 +353,41 @@ export function step(state, dt, p = {}) {
   if (m.D > 0.62) state.popped = true
 
   return state
+}
+
+/**
+ * How the launcher imprints the newborn bubble.
+ *
+ * POP's question has two halves — "how was the wind blowing *or* the wands held
+ * during launch?" — and the launcher is the second half. Two kinds behave very
+ * differently:
+ *
+ *   • Rigid wand: a fixed hoop. The opening is a fixed circle regardless of
+ *     wind, so the bubble is born round (only the pinch-off pop deforms it) at a
+ *     fixed size. Everything the post-launch shape then shows is *wind*.
+ *
+ *   • String loop: a compliant loop held by two handles. Pulling the handles
+ *     apart (`sep`, 0→1) stretches the opening into an ellipse, so the bubble is
+ *     born already elongated along — and tilted with — the loop. And the wind
+ *     billows the loop open, so a stronger breeze births a bigger bubble (how
+ *     giant bubbles are actually made). The launcher therefore stamps its own
+ *     shape onto the bubble, entangled with the wind.
+ *
+ * The imprint is an *initial* deformation: it rings out over the relaxation time
+ * while the wind's deformation persists — so telling "loop" from "wind" needs
+ * the time course (video), not one frame.
+ *
+ * @returns {{R:number, squash:number, tilt:number}} geometry for createBubble.
+ */
+export function launchGeometry({ type = 'loop', R = 70, sep = 0.4, tiltRad = 0, windPx = 0 } = {}) {
+  const pinch = 0.12 // every launcher pinches off a little as the film detaches
+  if (type === 'wand') {
+    return { R, squash: pinch, tilt: 0 }
+  }
+  // String loop: separation stretches the opening; wind billows it wider.
+  const aspect = Math.max(0, Math.min(1, sep))
+  const billow = 1 + 0.5 * Math.min(1, windPx / 200)
+  return { R: R * billow, squash: pinch + 0.9 * aspect, tilt: tiltRad }
 }
 
 /**
