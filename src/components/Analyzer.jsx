@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, memo } from 'react'
 import UncertaintyBadge from './UncertaintyBadge.jsx'
-import { analyzeSinglePhoto, VideoAnalyzer } from '../lib/inference.js'
+import { analyzeSinglePhoto, VideoAnalyzer, weberFromDeformation, velocityFromWeber } from '../lib/inference.js'
 
 // Sophisticated analyzer that can infer wind and wand motion from bubble shapes
 // using empirical surrogate laws and dynamic relaxation modeling

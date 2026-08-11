@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import Analyzer from './components/Analyzer.jsx'
 import Simulator from './components/Simulator.jsx'
+import BubblePhysics from './components/BubblePhysics.jsx'
 import ReferencesModal from './components/ReferencesModal.jsx'
 import CorrelationPanel from './components/CorrelationPanel.jsx'
 import Card from './components/Card.jsx'
@@ -32,6 +33,9 @@ export default function App() {
       </header>
       <main>
         <div className="grid">
+          <Card className="span-2" title="🫧 Live Physics: watch a bubble deform in the wind">
+            <BubblePhysics />
+          </Card>
           <Card title="1) Inverse: Photo/Video → Wind & Wand">
             <Analyzer />
           </Card>
