@@ -34,13 +34,19 @@ const TWO_PI = Math.PI * 2
  * @param {number} opts.vx  Initial launch velocity x (px/s)
  * @param {number} opts.vy  Initial launch velocity y (px/s)
  */
-export function createBubble({ cx = 360, cy = 200, R = 70, n = 56, vx = 0, vy = 0 } = {}) {
+export function createBubble({ cx = 360, cy = 200, R = 70, n = 56, vx = 0, vy = 0, squash = 0 } = {}) {
+  // `squash` pre-deforms the ring into an ellipse: a real bubble pinches off the
+  // wand and is born already distorted, so with light damping it rings (its
+  // Rayleigh–Lamb shape mode) as it relaxes. Area is preserved (stretch one
+  // axis, shrink the other by the same factor).
+  const sx = 1 + squash
+  const sy = 1 / sx
   const nodes = []
   for (let i = 0; i < n; i++) {
     const th = (i / n) * TWO_PI
     nodes.push({
-      x: cx + Math.cos(th) * R,
-      y: cy + Math.sin(th) * R,
+      x: cx + Math.cos(th) * R * sx,
+      y: cy + Math.sin(th) * R * sy,
       vx,
       vy,
     })
@@ -198,7 +204,10 @@ function nodeNormals(nodes, sign) {
  *      pressure on windward-facing nodes (∝ v_rel² · cosθ), which is what dents
  *      and elongates the bubble, and (b) linear drag (∝ v_rel), which advects
  *      the whole bubble downwind and damps flutter.
- *   4. A little gravity so a still bubble drifts down like a real one.
+ *   4. Gravity — a uniform body force so a still bubble drifts down, plus a
+ *      *sag* term (`sag`, ∝ the gravitational Bond number): a depth-weighted
+ *      pull that stretches a large bubble vertically even in dead-still air, the
+ *      same ellipse a vertical wind would produce.
  *
  * @param {object} state  Bubble from createBubble (mutated in place).
  * @param {number} dt     Frame time (s).
@@ -215,6 +224,7 @@ export function step(state, dt, p = {}) {
     stagnation = 0.9, // windward stagnation-pressure coefficient
     drag = 0.6, // linear (viscous) drag coefficient
     gravity = 18, // downward acceleration (px/s^2)
+    sag = 0, // gravitational sag coefficient (∝ Bond number); 0 = weightless film
     damping = 0.9, // per-second velocity retention (air resistance/relaxation)
     mass = 1,
     substeps = 4,
@@ -232,10 +242,14 @@ export function step(state, dt, p = {}) {
     const sign = area >= 0 ? 1 : -1
     const areaErr = (state.restArea - Math.abs(area)) / state.restArea
     const { normals, lengths } = nodeNormals(nodes, sign)
+    const cen = sag !== 0 ? centroid(nodes) : null
 
     // Accumulate forces.
     const fx = new Float64Array(n)
     const fy = new Float64Array(n)
+    // Gravity-sag is accumulated separately so we can strip its net (vertical)
+    // force and leave a pure shape change rather than a spurious drift.
+    let sagFy = 0
 
     for (let i = 0; i < n; i++) {
       const cur = nodes[i]
@@ -274,6 +288,17 @@ export function step(state, dt, p = {}) {
       fx[i] += fp * nrm.x
       fy[i] += fp * nrm.y
 
+      // (2b) Gravitational sag: the hanging film is pulled down more the lower a
+      // node sits (a depth-weighted vertical body force, de-meaned below so it
+      // deforms rather than drifts). The bubble stretches vertically — the same
+      // ellipse a vertical wind would make, which is exactly the point: from one
+      // silhouette, gravity sag and wind are indistinguishable.
+      if (sag !== 0) {
+        const gy = sag * (cur.y - cen.y) * L // deeper node (larger y) pulled down harder
+        fy[i] += gy
+        sagFy += gy
+      }
+
       // (3) Aerodynamics relative to the air.
       const vrx = windX - cur.vx
       const vry = windY - cur.vy
@@ -296,6 +321,13 @@ export function step(state, dt, p = {}) {
 
       // (4) Gravity.
       fy[i] += gravity * mass
+    }
+
+    // Remove the net force contributed by gravity-sag so it produces shape,
+    // not translation (weight/buoyancy drift is handled by the uniform gravity).
+    if (sag !== 0) {
+      const my = sagFy / n
+      for (let i = 0; i < n; i++) fy[i] -= my
     }
 
     // Integrate (semi-implicit Euler) with velocity damping.

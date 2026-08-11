@@ -46,6 +46,8 @@ const BubblePhysics = memo(function BubblePhysics() {
     R: 70, // bubble radius (px)
     kSpring: 260, // surface tension
     kPressure: 90, // internal pressure
+    bond: 0.8, // gravitational Bond number (gravity sag / teardrop)
+    film: 1.0, // soap-film thickness (µm) — sets membrane inertia / ring rate
   })
   const [running, setRunning] = useState(true)
   const [showField, setShowField] = useState(true)
@@ -70,6 +72,13 @@ const BubblePhysics = memo(function BubblePhysics() {
   // reports the physical wind speed the user dialled in.
   const PX_PER_MS = 26
 
+  // Bond number -> engine sag coefficient. The depth-weighted sag force scales
+  // with the bubble's size, so we compensate by (70/R) to keep the on-screen
+  // elongation set by Bo (not size), and cap it so it stays well short of pop.
+  const sagFromBond = (bond, R) => Math.min(0.04, bond * 0.011 * (70 / R))
+  // Film thickness (µm) -> node mass. Thicker film = heavier = slower ring.
+  const massFromFilm = (film) => 0.5 + film * 0.6
+
   const launchBubble = useCallback(() => {
     const p = paramsRef.current
     const ang = (p.windDir * Math.PI) / 180
@@ -82,6 +91,9 @@ const BubblePhysics = memo(function BubblePhysics() {
       n: 56,
       vx: Math.cos(ang) * v,
       vy: -Math.abs(Math.sin(ang) * v) - 60, // slight upward kick
+      // Pinch-off from the wand leaves the bubble born already deformed, so it
+      // rings (its Rayleigh–Lamb shape mode) as the film relaxes.
+      squash: 0.25 + 0.05 * p.launch,
     })
     tRef.current = 0
   }, [])
@@ -219,6 +231,9 @@ const BubblePhysics = memo(function BubblePhysics() {
           windY: wy,
           kSpring: p.kSpring,
           kPressure: p.kPressure,
+          gravity: 10, // soap bubbles are nearly neutrally buoyant — they float down slowly
+          sag: sagFromBond(p.bond, p.R),
+          mass: massFromFilm(p.film),
         })
 
         // Recycle the bubble once it drifts off-screen or bursts.
@@ -258,6 +273,8 @@ const BubblePhysics = memo(function BubblePhysics() {
             relTrue,
             relInfer,
             driftMs: Math.hypot(drift.vx, drift.vy) / PX_PER_MS,
+            bond: p.bond,
+            film: p.film,
             popped: state.popped,
           })
         }
@@ -339,6 +356,22 @@ const BubblePhysics = memo(function BubblePhysics() {
         </label>
       </div>
 
+      <div className="controls" style={{ gap: 16 }}>
+        <label className="pill" title="Gravitational Bond number — gravity sag vs. surface tension">
+          ⬇️ Gravity (Bo)
+          <input type="range" min="0" max="2.5" step="0.05" value={params.bond}
+            onChange={(e) => set('bond', parseFloat(e.target.value))} /> {params.bond.toFixed(2)}
+        </label>
+        <label className="pill" title="Soap-film thickness — sets membrane inertia (ring rate)">
+          🎞️ Film
+          <input type="range" min="0.3" max="3" step="0.1" value={params.film}
+            onChange={(e) => set('film', parseFloat(e.target.value))} /> {params.film.toFixed(1)} µm
+        </label>
+        <span className="small" style={{ alignSelf: 'center', color: 'var(--ink2)' }}>
+          Bo sags the bubble into a vertical stretch; a thicker film rings more slowly after launch.
+        </span>
+      </div>
+
       {readout && (
         <div className="kv">
           <div className="label">Measured deformation D</div>
@@ -365,6 +398,13 @@ const BubblePhysics = memo(function BubblePhysics() {
             {readout.driftMs.toFixed(1)} m/s downwind — you set {readout.windSet.toFixed(1)} m/s, but
             the film only feels the wind <em>relative</em> to its own motion
           </div>
+          <div className="label">Gravity sag vs. wind (the confound)</div>
+          <div>
+            Bo = {readout.bond.toFixed(2)}
+            {readout.bond >= 0.6
+              ? ' — gravity alone is stretching the bubble vertically, mimicking a wind signal'
+              : ' — negligible sag; deformation is wind-dominated'}
+          </div>
           <div className="label">Air-mass conservation</div>
           <div>{areaPct.toFixed(1)}% of rest area (pressure ↔ tension balance)</div>
         </div>
@@ -377,6 +417,17 @@ const BubblePhysics = memo(function BubblePhysics() {
         <em>relative</em> wind, one snapshot can't separate wind from the bubble's own motion — which
         is exactly why POP's analyzer turns to <strong>video</strong>. Crank the wind up and watch
         the film over-deform and pop.
+      </div>
+
+      <div className="notice small" style={{ margin: 0 }}>
+        <strong>Two extra physical parameters, added because they confound the inference:</strong>{' '}
+        <strong>Gravity (Bond number)</strong> stretches a big bubble vertically with <em>no wind at
+        all</em> — the same ellipse a vertical wind would make, which the shape-to-wind map would
+        misread. <strong>Film thickness</strong> sets the
+        membrane's inertia, so a freshly pinched bubble <em>rings</em> (its Rayleigh–Lamb shape mode)
+        and a single frame can catch it mid-wobble. Both make the same point: from one silhouette,
+        wind, sag, and ringing are degenerate — you need time (video) or a reference to tell them
+        apart.
       </div>
     </div>
   )
