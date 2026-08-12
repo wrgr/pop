@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
 import { createBubble, step, measure, driftVelocity, launchGeometry } from '../lib/engine.js'
 import { weberFromDeformation } from '../lib/inference.js'
+import { analyzeSeries } from '../lib/forensics.js'
 
 // Calibration of *this* engine: the empirical Weber number recovered from the
 // measured shape relates to the relative wind (in px/s) as We ≈ K_CAL · U_rel².
@@ -56,6 +57,7 @@ const BubblePhysics = memo(function BubblePhysics() {
   const [running, setRunning] = useState(true)
   const [showField, setShowField] = useState(true)
   const [readout, setReadout] = useState(null)
+  const [report, setReport] = useState(null)
 
   const canvasRef = useRef(null)
   const stateRef = useRef(null)
@@ -109,6 +111,45 @@ const BubblePhysics = memo(function BubblePhysics() {
       tilt: g.tilt,
     })
     tRef.current = 0
+  }, [])
+
+  // Go the other way: fly a fresh bubble with the current settings, record the
+  // shape series a camera would capture, then infer the environment back from
+  // it — and lay the recovered values next to the truth we set.
+  const recordAndAnalyze = useCallback(() => {
+    const p = paramsRef.current
+    const ang = (p.windDir * Math.PI) / 180
+    const wx = Math.cos(ang) * p.windSpeed * PX_PER_MS
+    const wy = Math.sin(ang) * p.windSpeed * PX_PER_MS
+    const g = launchGeometry({ type: p.launcher, R: p.R, sep: p.handleSep, tiltRad: 0, windPx: p.windSpeed * PX_PER_MS })
+    const v = p.launch * PX_PER_MS
+    const b = createBubble({
+      cx: 190, cy: H / 2, R: g.R, n: 56,
+      vx: Math.cos(ang) * v, vy: -Math.abs(Math.sin(ang) * v) - 60,
+      squash: g.squash, tilt: g.tilt,
+    })
+    const frames = []
+    const dt = 1 / 60
+    for (let t = 0; t < 2.4; t += dt) {
+      step(b, dt, {
+        windX: wx, windY: wy,
+        kSpring: p.kSpring, kPressure: p.kPressure,
+        gravity: 10, sag: sagFromBond(p.bond, p.R), mass: massFromFilm(p.film),
+        wake: p.wake, spin: p.spin,
+      })
+      const m = measure(b)
+      frames.push({ t, D: m.D, chi: m.chi, angle: m.angle, area: m.area, cx: m.centroid.x, cy: m.centroid.y })
+      if (b.popped) break
+    }
+    const rep = analyzeSeries(frames, { pxPerMs: PX_PER_MS, kCal: K_CAL })
+    setReport({
+      ...rep,
+      nFrames: frames.length,
+      truth: {
+        windSpeed: p.windSpeed, windDir: p.windDir, launcher: p.launcher,
+        film: p.film, spin: p.spin, bond: p.bond,
+      },
+    })
   }, [])
 
   // Seed a bubble on mount.
@@ -367,6 +408,9 @@ const BubblePhysics = memo(function BubblePhysics() {
           <input type="checkbox" checked={showField} onChange={(e) => setShowField(e.target.checked)} />
           🌬️ wind field
         </label>
+        <button className="btn" onClick={recordAndAnalyze} title="Fly a bubble, then infer the settings back from its shape series">
+          🎥 Record &amp; analyze
+        </button>
       </div>
 
       <div className="controls" style={{ gap: 12 }}>
@@ -545,6 +589,61 @@ const BubblePhysics = memo(function BubblePhysics() {
         Wind, sag, ringing, launcher, wake, and spin are all degenerate in one silhouette — which is
         why, to pull them apart, you have to go the other way: read a <em>series</em> of shapes over
         time. That's what the recorder below does.
+      </div>
+
+      <div className="card" style={{ margin: 0 }}>
+        <h4 style={{ marginTop: 0 }}>🔎 Inverse: infer the environment from a series of shapes</h4>
+        <p className="small" style={{ marginTop: 0 }}>
+          <strong>Record &amp; analyze</strong> flies a bubble with the settings above, captures the
+          shape it would show in each video frame, and reads the scene back out of that time-series —
+          the reverse of everything else here. Each cue is recovered by its own signature in time.
+        </p>
+        {!report && (
+          <p className="small" style={{ color: 'var(--ink2)' }}>
+            Set up a scene (wind, launcher, film, spin…), then hit <strong>🎥 Record &amp; analyze</strong>.
+          </p>
+        )}
+        {report && report.ok && (
+          <div className="stack">
+            <ul style={{ margin: '4px 0', paddingLeft: 20 }}>
+              {report.findings.map((f, i) => (
+                <li key={i} style={{ marginBottom: 4 }}>{f}</li>
+              ))}
+            </ul>
+            <div className="kv small">
+              <div className="label">Wind — recovered vs. set</div>
+              <div>
+                {report.windSpeedMs.toFixed(1)} m/s {report.windDirDeg === 0 ? '→' : '←'} vs.{' '}
+                <strong>{report.truth.windSpeed.toFixed(1)} m/s</strong> set
+              </div>
+              <div className="label">Launcher — recovered vs. set</div>
+              <div>
+                {report.launcher} vs. <strong>{report.truth.launcher === 'loop' ? 'string loop' : 'rigid wand'}</strong>{' '}
+                {report.launcherIsLoop === (report.truth.launcher === 'loop') ? '✓' : '✗'}
+              </div>
+              <div className="label">Film ringing — recovered vs. set</div>
+              <div>
+                {report.ringing ? `yes (~${report.ringHz.toFixed(1)} Hz)` : 'no'} vs.{' '}
+                <strong>{report.truth.film.toFixed(1)} µm film</strong>
+              </div>
+              <div className="label">Spin — recovered vs. set</div>
+              <div>
+                {report.spinning ? `${report.spinRate.toFixed(1)} rad/s` : 'none'} vs.{' '}
+                <strong>{report.truth.spin.toFixed(1)} rad/s</strong>{' '}
+                {report.spinning === report.truth.spin > 0.3 ? '✓' : ''}
+              </div>
+              <div className="label">Confidence</div>
+              <div>
+                {(report.confidence * 100).toFixed(0)}% ({report.nFrames} frames)
+              </div>
+            </div>
+            <div className="footer small" style={{ padding: 0, border: 'none' }}>
+              A single frame couldn't have told wind from sag from launcher from spin — but their
+              distinct <em>time signatures</em> (steady drift, curvature, a fading imprint, a rotating
+              tilt) pull them apart. That's POP's whole premise, run backwards.
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
