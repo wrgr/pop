@@ -1,5 +1,7 @@
 # POP — Phil's Orb Playground
 
+**▶️ Live demo: https://wrgr.github.io/pop/**
+
 **Can bubble shape predict wind and wand motion?**
 
 POP is a sophisticated physics-based tool that answers this fundamental question using empirical surrogate laws, dynamic relaxation modeling, and video analysis techniques.
