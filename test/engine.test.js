@@ -184,3 +184,59 @@ test('createBubble tilt rotates the launcher imprint (major axis follows tilt)',
   // Rotation preserves area.
   assert.ok(Math.abs(Math.abs(polygonArea(vert.nodes)) - Math.abs(polygonArea(horiz.nodes))) < 1, 'tilt should preserve area')
 })
+
+// --- Wake (leeward suction) and spin ---
+
+// Extents of the membrane windward/leeward of its centroid, measured along the
+// wind direction (+x here).
+function foreAft(state) {
+  const c = centroid(state.nodes)
+  let lee = 0 // downwind (+x) reach
+  let front = 0 // upwind (-x) reach
+  for (const nd of state.nodes) {
+    lee = Math.max(lee, nd.x - c.x)
+    front = Math.max(front, c.x - nd.x)
+  }
+  return { lee, front }
+}
+
+// Hold the bubble in place so the shape is read in a clean frame (the wake adds
+// some real downwind drift we don't want to chase across the domain).
+function held(state, seconds, p, dt = 1 / 120) {
+  for (let t = 0; t < seconds; t += dt) {
+    step(state, dt, p)
+    const c = centroid(state.nodes)
+    for (const nd of state.nodes) {
+      nd.x += 360 - c.x
+      nd.y += 200 - c.y
+    }
+  }
+  return state
+}
+
+test('the wake draws the leeward side out into a tail (fore-aft asymmetry)', () => {
+  const noWake = held(createBubble({ R: 60, n: 56 }), 1.2, { windX: 180, windY: 0, gravity: 0, wake: 0 })
+  const wake = held(createBubble({ R: 60, n: 56 }), 1.2, { windX: 180, windY: 0, gravity: 0, wake: 3 })
+  const a0 = foreAft(noWake)
+  const a1 = foreAft(wake)
+  // The wake pushes the leeward reach out past the windward reach; without it
+  // the shape is not leeward-biased.
+  assert.ok(a1.lee - a1.front > a0.lee - a0.front + 4, `wake should extend the tail: no-wake=${(a0.lee - a0.front).toFixed(1)} wake=${(a1.lee - a1.front).toFixed(1)}`)
+  assert.ok(a1.lee > a1.front, `leeward tail should out-reach the windward face: lee=${a1.lee.toFixed(1)} front=${a1.front.toFixed(1)}`)
+})
+
+test('spin rotates the membrane so an elongated bubble tumbles', () => {
+  // Start elongated (a launcher imprint) so rotation is observable.
+  const b = createBubble({ R: 70, n: 56, squash: 0.4 })
+  const a0 = measure(b).angle
+  settle(b, 0.5, { windX: 0, windY: 0, gravity: 0, spin: 3, damping: 1 })
+  const a1 = measure(b).angle
+  assert.ok(Math.abs(a1 - a0) > 0.4, `a spinning elongated bubble should change its measured tilt: ${a0} -> ${a1}`)
+  assert.ok((b.spinAngle || 0) > 1, 'spinAngle should accumulate')
+})
+
+test('spin conserves the shape (a round bubble stays round while spinning)', () => {
+  const b = createBubble({ R: 60, n: 56 })
+  settle(b, 0.6, { windX: 0, windY: 0, gravity: 0, spin: 4 })
+  assert.ok(measure(b).D < 0.03, 'pure spin should not deform a round bubble')
+})

@@ -50,6 +50,8 @@ const BubblePhysics = memo(function BubblePhysics() {
     film: 1.0, // soap-film thickness (µm) — sets membrane inertia / ring rate
     launcher: 'loop', // 'loop' (compliant string loop) or 'wand' (rigid hoop)
     handleSep: 0.45, // string-loop handle separation (0 = round loop, 1 = long thin)
+    wake: 0, // leeward wake suction — fore-aft asymmetry (bluff-body tail)
+    spin: 0, // rigid rotation rate (rad/s) — a tumbling bubble
   })
   const [running, setRunning] = useState(true)
   const [showField, setShowField] = useState(true)
@@ -282,6 +284,8 @@ const BubblePhysics = memo(function BubblePhysics() {
           gravity: 10, // soap bubbles are nearly neutrally buoyant — they float down slowly
           sag: sagFromBond(p.bond, p.R),
           mass: massFromFilm(p.film),
+          wake: p.wake,
+          spin: p.spin,
         })
 
         // Recycle the bubble once it drifts off-screen or bursts.
@@ -452,6 +456,23 @@ const BubblePhysics = memo(function BubblePhysics() {
         </span>
       </div>
 
+      <div className="controls" style={{ gap: 16 }}>
+        <label className="pill" title="Leeward wake suction — draws a fore-aft tail">
+          🌀 Wake
+          <input type="range" min="0" max="5" step="0.1" value={params.wake}
+            onChange={(e) => set('wake', parseFloat(e.target.value))} /> {params.wake.toFixed(1)}
+        </label>
+        <label className="pill" title="Rigid spin rate (rad/s) — a tumbling bubble">
+          🔁 Spin
+          <input type="range" min="0" max="6" step="0.2" value={params.spin}
+            onChange={(e) => set('spin', parseFloat(e.target.value))} /> {params.spin.toFixed(1)} rad/s
+        </label>
+        <span className="small" style={{ alignSelf: 'center', color: 'var(--ink2)' }}>
+          Wake draws a downwind tail (form drag); spin tumbles any elongation, so a single frame's
+          tilt lies — but a series gives it away.
+        </span>
+      </div>
+
       {readout && (
         <div className="kv">
           <div className="label">Measured deformation D</div>
@@ -515,15 +536,15 @@ const BubblePhysics = memo(function BubblePhysics() {
       </div>
 
       <div className="notice small" style={{ margin: 0 }}>
-        <strong>Three physical parameters, added because they confound the inference:</strong>{' '}
-        <strong>Gravity (Bond number)</strong> stretches a big bubble vertically with <em>no wind at
-        all</em> — the same ellipse a vertical wind would make. <strong>Film thickness</strong> sets
-        the membrane's inertia, so a freshly pinched bubble <em>rings</em> (its Rayleigh–Lamb shape
-        mode) and a single frame can catch it mid-wobble. And the <strong>launcher</strong> is the
-        other half of POP's question — a <em>string loop</em> stamps its own elongation onto the
-        bubble (and the wind billows it open), whereas a <em>rigid wand</em> hands off a clean round
-        start. All four cues — wind, sag, ringing, and how the wand was held — are degenerate in one
-        silhouette; you need time (video) or a reference to tell them apart.
+        <strong>Every knob here can masquerade as wind:</strong> <strong>gravity (Bond number)</strong>{' '}
+        stretches a big bubble vertically with <em>no wind at all</em>; <strong>film thickness</strong>{' '}
+        sets the inertia, so a freshly pinched bubble <em>rings</em> and a frame can catch it
+        mid-wobble; the <strong>launcher</strong> — POP's other half — stamps the bubble with the
+        loop's own elongation (a rigid wand hands off a clean round start); a <strong>wake</strong>{' '}
+        draws a downwind tail; and <strong>spin</strong> tumbles the whole shape so its tilt rotates.
+        Wind, sag, ringing, launcher, wake, and spin are all degenerate in one silhouette — which is
+        why, to pull them apart, you have to go the other way: read a <em>series</em> of shapes over
+        time. That's what the recorder below does.
       </div>
     </div>
   )

@@ -206,13 +206,16 @@ function nodeNormals(nodes, sign) {
  *      normal with a force proportional to the fractional area deficit; this is
  *      what keeps the bubble inflated and fights the springs.
  *   3. Aerodynamics — relative to the moving air we apply (a) stagnation
- *      pressure on windward-facing nodes (∝ v_rel² · cosθ), which is what dents
- *      and elongates the bubble, and (b) linear drag (∝ v_rel), which advects
- *      the whole bubble downwind and damps flutter.
+ *      pressure on windward-facing nodes (∝ v_rel² · cosθ), which dents and
+ *      elongates the bubble, (b) a leeward `wake` suction (∝ v_rel² · cosθ on
+ *      the back) that draws the tail out for a fore-aft-asymmetric bluff-body
+ *      shape, and (c) linear drag (∝ v_rel), which advects the bubble downwind.
  *   4. Gravity — a uniform body force so a still bubble drifts down, plus a
  *      *sag* term (`sag`, ∝ the gravitational Bond number): a depth-weighted
  *      pull that stretches a large bubble vertically even in dead-still air, the
  *      same ellipse a vertical wind would produce.
+ *   5. Spin — an optional rigid rotation (`spin`, rad/s) of the whole membrane
+ *      about its centroid, so any elongation tumbles rather than holding still.
  *
  * @param {object} state  Bubble from createBubble (mutated in place).
  * @param {number} dt     Frame time (s).
@@ -227,9 +230,11 @@ export function step(state, dt, p = {}) {
     kPressure = 90, // internal air-pressure gain
     kBend = 40, // membrane bending stiffness (resists the film folding/caving)
     stagnation = 0.9, // windward stagnation-pressure coefficient
+    wake = 0, // leeward low-pressure (wake) suction — form drag / fore-aft asymmetry
     drag = 0.6, // linear (viscous) drag coefficient
     gravity = 18, // downward acceleration (px/s^2)
     sag = 0, // gravitational sag coefficient (∝ Bond number); 0 = weightless film
+    spin = 0, // rigid rotation rate (rad/s) about the centroid — a tumbling bubble
     damping = 0.9, // per-second velocity retention (air resistance/relaxation)
     mass = 1,
     substeps = 4,
@@ -247,7 +252,12 @@ export function step(state, dt, p = {}) {
     const sign = area >= 0 ? 1 : -1
     const areaErr = (state.restArea - Math.abs(area)) / state.restArea
     const { normals, lengths } = nodeNormals(nodes, sign)
-    const cen = sag !== 0 ? centroid(nodes) : null
+    const cen = sag !== 0 || wake !== 0 ? centroid(nodes) : null
+
+    // Wind unit vector and speed, for the wake tail below.
+    const windMag = Math.hypot(windX, windY)
+    const wux = windMag > 1e-6 ? windX / windMag : 0
+    const wuy = windMag > 1e-6 ? windY / windMag : 0
 
     // Accumulate forces.
     const fx = new Float64Array(n)
@@ -322,6 +332,22 @@ export function step(state, dt, p = {}) {
         const fd = drag * L * 1e-2
         fx[i] += fd * vrx
         fy[i] += fd * vry
+
+        // (3b) Wake: the low-pressure region behind a bluff body draws its
+        // trailing edge out into a tail. We pull the leeward tip downwind along
+        // the relative wind, weighted by how far downwind the node already sits
+        // (squared, so the effect concentrates at the tip and forms a tail
+        // rather than just inflating the back). Scales with the wind speed, so a
+        // bubble drifting with the air (no relative wind) has no wake.
+        if (wake !== 0) {
+          const sProj = ((cur.x - cen.x) * vrx + (cur.y - cen.y) * vry) / speed
+          if (sProj > 0) {
+            const w = sProj / state.R0
+            const fw = wake * w * w * speed * L * 3e-2
+            fx[i] += fw * vrx / speed
+            fy[i] += fw * vry / speed
+          }
+        }
       }
 
       // (4) Gravity.
@@ -334,6 +360,9 @@ export function step(state, dt, p = {}) {
       const my = sagFy / n
       for (let i = 0; i < n; i++) fy[i] -= my
     }
+    // The wake tail is deliberately NOT de-meaned: its asymmetry is the whole
+    // point (a drawn-out leeward tail), and its small net downwind push is just
+    // the extra form drag a bluff wake really adds.
 
     // Integrate (semi-implicit Euler) with velocity damping.
     for (let i = 0; i < n; i++) {
@@ -343,6 +372,29 @@ export function step(state, dt, p = {}) {
       node.x += node.vx * h
       node.y += node.vy * h
     }
+  }
+
+  // Rigid spin: rotate the whole membrane (positions and velocities) about its
+  // centroid. A spinning bubble carries any elongation around with it, so the
+  // major-axis tilt a single frame reports is unreliable — but across a series
+  // the steady advance of the angle gives the spin away. (A perfectly round
+  // bubble shows no visible spin; couple it with wind/sag/launcher elongation.)
+  if (spin !== 0) {
+    const dth = spin * dt
+    const c = Math.cos(dth)
+    const s = Math.sin(dth)
+    const cen = centroid(nodes)
+    for (const nd of nodes) {
+      const dx = nd.x - cen.x
+      const dy = nd.y - cen.y
+      nd.x = cen.x + dx * c - dy * s
+      nd.y = cen.y + dx * s + dy * c
+      const vx = nd.vx * c - nd.vy * s
+      const vy = nd.vx * s + nd.vy * c
+      nd.vx = vx
+      nd.vy = vy
+    }
+    state.spinAngle = (state.spinAngle || 0) + dth
   }
 
   state.age += dt
