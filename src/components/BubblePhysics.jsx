@@ -2,6 +2,24 @@ import React, { useEffect, useRef, useState, useCallback, useMemo, memo } from '
 import { createBubble, step, measure, driftVelocity, launchGeometry } from '../lib/engine.js'
 import { weberFromDeformation } from '../lib/inference.js'
 import { analyzeSeries } from '../lib/forensics.js'
+import { computeMouthStats, calculateLoopArea } from '../lib/physics.js'
+import WandEditor from './WandEditor.jsx'
+import Drawer from './Drawer.jsx'
+
+// Derive a bubble's birth geometry from a hand-drawn wand loop: its area sets
+// the size, its aspect sets the elongation, its tilt sets the orientation — so
+// the shape you draw is the shape the bubble is born with.
+function customGeometry(points) {
+  const area = calculateLoopArea(points)
+  const stats = computeMouthStats(points)
+  if (!area || (!stats.width && !stats.height)) return null
+  const loopR = Math.sqrt(area / Math.PI) // px in the editor's frame
+  const R = Math.max(35, Math.min(110, loopR))
+  const big = Math.max(stats.width, stats.height)
+  const small = Math.max(1, Math.min(stats.width, stats.height))
+  const squash = Math.max(0, Math.min(0.8, big / small - 1))
+  return { R, squash, tilt: stats.angle }
+}
 
 // Calibration of *this* engine: the empirical Weber number recovered from the
 // measured shape relates to the relative wind (in px/s) as We ≈ K_CAL · U_rel².
@@ -12,8 +30,8 @@ const K_CAL = 1.3e-4
 /**
  * Live soft-body bubble physics playground.
  *
- * Unlike the algebraic Simulator (which draws the ellipse a formula predicts),
- * this component runs POP's real `engine.js`: a membrane of point masses that
+ * Rather than drawing the ellipse a closed-form formula predicts, this component
+ * runs POP's real `engine.js`: a membrane of point masses that
  * actually deforms and drifts under a simulated wind. Every frame we *measure*
  * the emergent shape and run POP's inverse model on it — so you can watch the
  * core question answer itself in real time: the shape the physics produces is
@@ -49,7 +67,7 @@ const BubblePhysics = memo(function BubblePhysics() {
     kPressure: 90, // internal pressure
     bond: 0.8, // gravitational Bond number (gravity sag / teardrop)
     film: 1.0, // soap-film thickness (µm) — sets membrane inertia / ring rate
-    launcher: 'loop', // 'loop' (compliant string loop) or 'wand' (rigid hoop)
+    launcher: 'loop', // 'loop' string loop | 'wand' rigid hoop | 'custom' drawn loop
     handleSep: 0.45, // string-loop handle separation (0 = round loop, 1 = long thin)
     wake: 0, // leeward wake suction — fore-aft asymmetry (bluff-body tail)
     spin: 0, // rigid rotation rate (rad/s) — a tumbling bubble
@@ -58,6 +76,9 @@ const BubblePhysics = memo(function BubblePhysics() {
   const [showField, setShowField] = useState(true)
   const [readout, setReadout] = useState(null)
   const [report, setReport] = useState(null)
+  const [wand, setWand] = useState([]) // custom wand/loop control points (WandEditor)
+  const wandRef = useRef(wand)
+  useEffect(() => { wandRef.current = wand }, [wand])
 
   const canvasRef = useRef(null)
   const stateRef = useRef(null)
@@ -85,21 +106,29 @@ const BubblePhysics = memo(function BubblePhysics() {
   // Film thickness (µm) -> node mass. Thicker film = heavier = slower ring.
   const massFromFilm = (film) => 0.5 + film * 0.6
 
-  const launchBubble = useCallback(() => {
-    const p = paramsRef.current
-    const ang = (p.windDir * Math.PI) / 180
-    // Launch mostly along the wind, with a little upward pop off the launcher.
-    const v = p.launch * PX_PER_MS
-    // The launcher (rigid wand vs. compliant string loop) sets the bubble's
-    // birth size, elongation and tilt. The loop stamps its own shape on; the
-    // rigid wand hands off a clean round bubble.
-    const g = launchGeometry({
+  // Resolve the newborn bubble's {R, squash, tilt} from the chosen launcher.
+  // 'custom' reads the hand-drawn loop; the others use the analytic model.
+  const geometryFor = useCallback((p) => {
+    if (p.launcher === 'custom') {
+      const g = customGeometry(wandRef.current)
+      if (g) return g
+    }
+    return launchGeometry({
       type: p.launcher,
       R: p.R,
       sep: p.handleSep,
       tiltRad: 0, // handles held horizontally -> horizontal loop imprint
       windPx: p.windSpeed * PX_PER_MS,
     })
+  }, [])
+
+  const launchBubble = useCallback(() => {
+    const p = paramsRef.current
+    const ang = (p.windDir * Math.PI) / 180
+    // Launch mostly along the wind, with a little upward pop off the launcher.
+    const v = p.launch * PX_PER_MS
+    // The launcher sets the bubble's birth size, elongation and tilt.
+    const g = geometryFor(p)
     stateRef.current = createBubble({
       cx: 190,
       cy: H / 2,
@@ -111,7 +140,7 @@ const BubblePhysics = memo(function BubblePhysics() {
       tilt: g.tilt,
     })
     tRef.current = 0
-  }, [])
+  }, [geometryFor])
 
   // Go the other way: fly a fresh bubble with the current settings, record the
   // shape series a camera would capture, then infer the environment back from
@@ -121,7 +150,7 @@ const BubblePhysics = memo(function BubblePhysics() {
     const ang = (p.windDir * Math.PI) / 180
     const wx = Math.cos(ang) * p.windSpeed * PX_PER_MS
     const wy = Math.sin(ang) * p.windSpeed * PX_PER_MS
-    const g = launchGeometry({ type: p.launcher, R: p.R, sep: p.handleSep, tiltRad: 0, windPx: p.windSpeed * PX_PER_MS })
+    const g = geometryFor(p)
     const v = p.launch * PX_PER_MS
     const b = createBubble({
       cx: 190, cy: H / 2, R: g.R, n: 56,
@@ -150,7 +179,7 @@ const BubblePhysics = memo(function BubblePhysics() {
         film: p.film, spin: p.spin, bond: p.bond,
       },
     })
-  }, [])
+  }, [geometryFor])
 
   // Seed a bubble on mount.
   useEffect(() => { launchBubble() }, [launchBubble])
@@ -223,6 +252,26 @@ const BubblePhysics = memo(function BubblePhysics() {
       ctx.beginPath()
       ctx.ellipse(Lx, Ly, 26, 28, 0, 0, Math.PI * 2)
       ctx.stroke()
+    } else if (p.launcher === 'custom') {
+      // Custom loop drawn in the editor below: preview its birth shape here.
+      const g = customGeometry(wandRef.current)
+      ctx.strokeStyle = 'rgba(160,120,255,0.95)'
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.moveTo(150, H - 16)
+      ctx.lineTo(Lx - 14, Ly + 26)
+      ctx.stroke()
+      ctx.lineWidth = 3
+      ctx.setLineDash([6, 4])
+      ctx.beginPath()
+      if (g) {
+        const sx = 1 + g.squash
+        ctx.ellipse(Lx, Ly, 27 * sx, 29 / sx, g.tilt, 0, Math.PI * 2)
+      } else {
+        ctx.ellipse(Lx, Ly, 27, 29, 0, 0, Math.PI * 2)
+      }
+      ctx.stroke()
+      ctx.setLineDash([])
     } else {
       // String loop between two handles: sways, and the wind billows it open.
       const windSign = wx >= 0 ? 1 : -1
@@ -428,6 +477,12 @@ const BubblePhysics = memo(function BubblePhysics() {
           >
             ⭕ Rigid wand
           </button>
+          <button
+            className={`btn small ${params.launcher === 'custom' ? 'primary' : 'ghost'}`}
+            onClick={() => set('launcher', 'custom')}
+          >
+            ✏️ Custom loop
+          </button>
         </div>
         {params.launcher === 'loop' && (
           <label className="pill" title="Handle separation — pulls the loop into a long thin opening">
@@ -439,9 +494,22 @@ const BubblePhysics = memo(function BubblePhysics() {
         <span className="small" style={{ alignSelf: 'center', color: 'var(--ink2)' }}>
           {params.launcher === 'loop'
             ? 'A compliant loop stamps its own elongation on the bubble and the wind billows it open.'
-            : 'A rigid hoop hands off a clean round bubble — post-launch shape is pure wind.'}
+            : params.launcher === 'wand'
+              ? 'A rigid hoop hands off a clean round bubble — post-launch shape is pure wind.'
+              : 'Shape the loop below — its area sets the bubble’s size, its aspect and tilt its birth shape.'}
         </span>
       </div>
+
+      {params.launcher === 'custom' && (
+        <div className="card" style={{ margin: 0 }}>
+          <h4 style={{ marginTop: 0 }}>✏️ Design your wand</h4>
+          <p className="small" style={{ marginTop: 0 }}>
+            Drag the handles and blue string points to shape the loop, then <strong>Launch</strong> or{' '}
+            <strong>Record &amp; analyze</strong> — the bubble is born in the loop’s size, aspect and tilt.
+          </p>
+          <WandEditor points={wand} onChange={setWand} />
+        </div>
+      )}
 
       <div className="controls" style={{ gap: 16 }}>
         <label className="pill" title="Wind speed (m/s)">
@@ -466,6 +534,7 @@ const BubblePhysics = memo(function BubblePhysics() {
         </label>
       </div>
 
+      <Drawer title="⚙️ More parameters (bubble, gravity, film, wake, spin)">
       <div className="controls" style={{ gap: 16 }}>
         <label className="pill" title="Bubble radius (px)">
           ⚪ Size
@@ -516,6 +585,7 @@ const BubblePhysics = memo(function BubblePhysics() {
           tilt lies — but a series gives it away.
         </span>
       </div>
+      </Drawer>
 
       {readout && (
         <div className="kv">

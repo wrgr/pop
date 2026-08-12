@@ -1,20 +1,72 @@
 import React, { useState, useCallback } from 'react'
 import Analyzer from './components/Analyzer.jsx'
-import Simulator from './components/Simulator.jsx'
 import BubblePhysics from './components/BubblePhysics.jsx'
 import ReferencesModal from './components/ReferencesModal.jsx'
 import CorrelationPanel from './components/CorrelationPanel.jsx'
 import Card from './components/Card.jsx'
+import Drawer from './components/Drawer.jsx'
 import SimplePerformanceMonitor from './components/SimplePerformanceMonitor.jsx'
-import ScientificDemo from './components/ScientificDemo.jsx'
 import logo from './images/logo.jpg'
+
+// Citations, rendered as collapsible drawers so the page stays short.
+const REFERENCES = [
+  {
+    title: '🎯 Loth (2008) — the empirical surrogate law',
+    who: 'Loth, E. (2008). Quasi-steady shape and drag of deformable bubbles and drops. Progress in Energy and Combustion Science, 34(5), 423–455.',
+    url: 'https://doi.org/10.1016/j.pecs.2008.01.002',
+    summary:
+      'Provides D ≈ k₁We/(1 + k₂We), linking bubble deformation to flow conditions (k₁ ≈ 0.24, k₂ ≈ 0.75 from experiment). This is the core equation behind POP’s inverse analysis.',
+  },
+  {
+    title: '🏗️ Taylor (1932) — the deformation parameter',
+    who: 'Taylor, G. I. (1932). The viscosity of a fluid containing small drops of another fluid. Proc. Royal Society A, 138, 41–48.',
+    url: 'https://doi.org/10.1098/rspa.1932.0169',
+    summary:
+      'Established D = (a-b)/(a+b), the standard measure of drop/bubble elongation POP reads off every shape.',
+  },
+  {
+    title: '📚 Clift, Grace & Weber (1978) — bubble dynamics',
+    who: 'Clift, R., Grace, J. R., & Weber, M. E. (1978). Bubbles, Drops, and Particles. Academic Press.',
+    url: 'https://www.elsevier.com/books/bubbles-drops-and-particles/clift/978-0-12-176950-5',
+    summary:
+      'The comprehensive reference on shape deformation, drag and dimensionless groups — the theoretical backdrop for why bubbles deform in wind.',
+  },
+  {
+    title: '🔄 Rallison (1984) — viscous drops in shear',
+    who: 'Rallison, J. M. (1984). The deformation of small viscous drops and bubbles in shear flows. Annu. Rev. Fluid Mech., 16, 45–66.',
+    url: 'https://doi.org/10.1146/annurev.fl.16.010184.000401',
+    summary:
+      'Explains the time-dependent response POP models as the relaxation time τ — why a bubble does not snap instantly to a new wind.',
+  },
+  {
+    title: '🧼 Rao et al. (2024) — soap bubble inflation',
+    who: 'Rao, R. et al. (2024). Dynamics of soap bubble inflation. Physical Review Fluids, 9, L051602.',
+    url: 'https://doi.org/10.1103/PhysRevFluids.9.L051602',
+    summary:
+      'Studies detachment and initial shape formation — the physics behind the launcher imprint (how the wand shapes a newborn bubble).',
+  },
+  {
+    title: '💧 Chatzigiannakis et al. (2021) — thin liquid films',
+    who: 'Chatzigiannakis, E. et al. (2021). Thin liquid films: a review. Curr. Opin. Colloid Interface Sci., 56, 101461.',
+    url: 'https://doi.org/10.1016/j.cocis.2021.101461',
+    summary:
+      'Covers drainage, stability and rupture of bubble walls — why some bubbles pop and others survive, setting the analysis window.',
+  },
+  {
+    title: '📊 Lide (2004) — air properties',
+    who: 'Lide, D. R. (2004). CRC Handbook of Chemistry and Physics. CRC Press.',
+    url: 'https://www.routledge.com/CRC-Handbook-of-Chemistry-and-Physics-85th-Edition/Lide/p/book/9780849304859',
+    summary:
+      'Supplies the physical constants (air density ρ ≈ 1.2 kg/m³, viscosity μ ≈ 1.8×10⁻⁵ Pa·s) POP’s calculations use.',
+  },
+]
 
 export default function App() {
   const [refsOpen, setRefsOpen] = useState(false)
-  
+
   const openRefs = useCallback(() => setRefsOpen(true), [])
   const closeRefs = useCallback(() => setRefsOpen(false), [])
-  
+
   return (
     <>
       {process.env.NODE_ENV === 'development' && <SimplePerformanceMonitor />}
@@ -36,288 +88,59 @@ export default function App() {
           <Card className="span-2" title="🫧 Live Physics: watch a bubble deform in the wind">
             <BubblePhysics />
           </Card>
-          <Card title="1) Inverse: Photo/Video → Wind & Wand">
+
+          <Card title="🔍 Inverse: Photo / Video → Wind & Wand">
             <Analyzer />
           </Card>
-          <Card title="2) Forward: Wind & Wand → Bubble">
-            <Simulator />
-          </Card>
-          <Card title="3) Model parameters (χ ↔ We ↔ U)">
+
+          <Card title="⚙️ Model parameters (χ ↔ We ↔ U)">
             <CorrelationPanel />
             <div className="footer small">
               These constants feed the axis‑ratio → Weber and Weber → wind
-              mapping used by POP. Adjust them to match your calibration.
-              See the "How to Use" section above for detailed guidance.
-            </div>
-          </Card>
-          {/* Core Question & Key Insights */}
-          <Card title="🎯 Core Question & Key Insights">
-            <div className="stack">
-              <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '20px', borderRadius: '12px' }}>
-                <h3 style={{ color: 'white', margin: '0 0 16px 0' }}>Can Bubble Shape Predict Wind & Wand Motion?</h3>
-                <div style={{ fontSize: '16px', lineHeight: '1.6' }}>
-                  <p><strong>Answer: YES, with sophisticated physics modeling!</strong></p>
-                  <p>The key insight is the empirical surrogate law D ≈ k₁We/(1 + k₂We) that links observable bubble deformation to underlying flow physics, enabling bidirectional inference with physical validation.</p>
-                </div>
-              </div>
-              
-              <div className="card">
-                <h4>🔬 What We Can Extract:</h4>
-                <ul>
-                  <li><strong>Wind Speed:</strong> From bubble elongation (Weber number)</li>
-                  <li><strong>Wind Direction:</strong> From major axis orientation</li>
-                  <li><strong>Wand Motion:</strong> From video analysis (least-squares fitting)</li>
-                  <li><strong>Confidence:</strong> Quantified uncertainty assessment</li>
-                </ul>
-              </div>
-              
-              <div className="card">
-                <h4>🧪 How It Works:</h4>
-                <ul>
-                  <li><strong>Single Photo:</strong> Use empirical surrogate laws to map deformation to Weber number</li>
-                  <li><strong>Video Analysis:</strong> Separate wand release motion from ambient wind using least-squares fitting</li>
-                  <li><strong>Physics Validation:</strong> All results are constrained by known fluid mechanics relationships</li>
-                </ul>
-              </div>
+              mapping. Adjust them to match your own calibration.
             </div>
           </Card>
 
-          {/* How to Use & Scientific Foundation */}
-          <Card title="📚 How to Use POP">
+          <Card title="ℹ️ About POP">
             <div className="stack">
               <p>
-                POP demonstrates the power of physics-based modeling to answer the core question: 
-                <strong> "Can bubble shape predict wind and wand motion?"</strong>
+                POP answers one question — <strong>can a bubble's shape reveal the wind and how the
+                wand was held?</strong> — by simulating it both ways. The <strong>Live Physics</strong>{' '}
+                panel runs a real soft-body soap film (surface tension, internal pressure, an
+                aerodynamic wind, gravity sag, spin and a choice of launcher), measures the emergent
+                shape, and infers the conditions back from it — including from a whole recorded series.
               </p>
-              <p>
-                <strong>Key Components:</strong>
-              </p>
+              <p><strong>What you can do here:</strong></p>
               <ul>
-                <li><strong>Analyzer:</strong> Upload photos/videos to analyze real bubbles</li>
-                <li><strong>Simulator:</strong> Explore wind-wand-bubble relationships</li>
-                <li><strong>Wand Editor:</strong> Design custom wand configurations</li>
+                <li><strong>Live Physics:</strong> play the forward model, then hit <em>Record &amp; analyze</em> to run it in reverse.</li>
+                <li><strong>Analyzer:</strong> fit an ellipse to a real photo or video and read out wind &amp; wand.</li>
+                <li><strong>Custom loop:</strong> design your own wand in Live Physics — its shape becomes the bubble's.</li>
               </ul>
-              <button className="btn" onClick={openRefs}>📖 Detailed How-to Guide</button>
+              <p className="small">
+                POP is a teaching tool built on literature‑inspired heuristics (deformation ↔ Weber
+                number, capillary/relaxation scaling) — not a metrology instrument — but it can be
+                locally calibrated.
+              </p>
+              <button className="btn" onClick={openRefs}>📖 How-to guide</button>
             </div>
           </Card>
 
-          {/* Scientific Demo */}
-          <Card title="4) Scientific Foundation">
-            <ScientificDemo />
-          </Card>
-          <Card title="About & Citations" bodyClassName="small">
-            <p>
-              POP uses literature‑inspired heuristics: ellipse deformation ↔
-              Weber number, capillary/relaxation scaling, and launch
-              elongation from wand jerk. It's a teaching tool — not a
-              metrology instrument — but can be locally calibrated.
+          <Card className="span-2" title="📚 Scientific References & Citations">
+            <p className="small" style={{ marginTop: 0 }}>
+              The literature POP's heuristics are built on. Expand any entry for a plain-English
+              summary and the paper link.
             </p>
-            <p>
-              POP demonstrates the power of physics-based modeling for inverse problems in fluid mechanics. 
-              By combining empirical surrogate laws with dynamic relaxation modeling, it can extract 
-              wind and wand motion information from bubble shapes with quantified uncertainty.
-            </p>
-            <a className="btn" href="help.html" target="_blank" rel="noopener">
-              ℹ️ Help
-            </a>
-          </Card>
-          
-          {/* Comprehensive References Section */}
-          <Card title="📚 Scientific References & Citations">
-            <div className="stack">
-              <div className="card">
-                <h4>🎯 Core Physics: Bubble Deformation & Flow</h4>
-                <div className="kv small">
-                  <div className="label">Primary Reference</div>
-                  <div>
-                    <strong>Loth, E. (2008).</strong> Quasi-steady shape and drag of deformable bubbles and drops. 
-                    <em>Progress in Energy and Combustion Science</em>, 34(5), 423–455.
-                    <br/>
-                    <a href="https://doi.org/10.1016/j.pecs.2008.01.002" target="_blank" rel="noopener" className="btn small">
-                      🔗 View Paper
-                    </a>
-                  </div>
-                  <div className="label">Plain English Summary</div>
-                  <div>
-                    This paper provides the empirical surrogate law D ≈ k₁We/(1 + k₂We) that links 
-                    bubble deformation to flow conditions. It's the foundation of POP's ability to 
-                    infer wind from bubble shape. The constants k₁ ≈ 0.24 and k₂ ≈ 0.75 are 
-                    calibrated from experimental data on bubble deformation in uniform flows.
-                  </div>
-                  <div className="label">How It Supports POP</div>
-                  <div>
-                    <strong>Provides the empirical surrogate law</strong> that enables bidirectional 
-                    inference between bubble shape and wind conditions. This is the core equation 
-                    that makes POP's inverse analysis possible.
-                  </div>
+            {REFERENCES.map((r) => (
+              <Drawer key={r.url} title={r.title}>
+                <div className="stack small">
+                  <p style={{ margin: 0 }}>{r.who}</p>
+                  <p style={{ margin: 0 }}>{r.summary}</p>
+                  <a href={r.url} target="_blank" rel="noopener" className="btn small" style={{ alignSelf: 'flex-start' }}>
+                    🔗 View source
+                  </a>
                 </div>
-              </div>
-
-              <div className="card">
-                <h4>🏗️ Foundation: Classical Deformation Theory</h4>
-                <div className="kv small">
-                  <div className="label">Taylor, G. I. (1932)</div>
-                  <div>
-                    The viscosity of a fluid containing small drops of another fluid. 
-                    <em>Proceedings of the Royal Society A</em>, 138, 41–48.
-                    <br/>
-                    <a href="https://doi.org/10.1098/rspa.1932.0169" target="_blank" rel="noopener" className="btn small">
-                      🔗 View Paper
-                    </a>
-                  </div>
-                  <div className="label">Plain English Summary</div>
-                  <div>
-                    Taylor's foundational work established the deformation parameter D = (a-b)/(a+b) 
-                    for analyzing drop and bubble shapes in shear flows. This parameter is now 
-                    standard in fluid mechanics and provides the mathematical framework for 
-                    quantifying bubble elongation.
-                  </div>
-                  <div className="label">How It Supports POP</div>
-                  <div>
-                    <strong>Establishes the deformation parameter D</strong> that quantifies 
-                    bubble elongation in a physically meaningful way. This is the fundamental 
-                    measurement that POP uses to analyze bubble shapes.
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <h4>📚 Comprehensive Reference: Bubble Dynamics</h4>
-                <div className="kv small">
-                  <div className="label">Clift, R., Grace, J. R., & Weber, M. E. (1978)</div>
-                  <div>
-                    <em>Bubbles, Drops, and Particles</em>. Academic Press.
-                    <br/>
-                    <a href="https://www.elsevier.com/books/bubbles-drops-and-particles/clift/978-0-12-176950-5" target="_blank" rel="noopener" className="btn small">
-                      🔗 View Book
-                    </a>
-                  </div>
-                  <div className="label">Plain English Summary</div>
-                  <div>
-                    This comprehensive textbook covers all aspects of bubble and drop behavior, 
-                    including shape deformation, drag forces, and dimensionless groups. It provides 
-                    the theoretical background for understanding why bubbles deform in wind and 
-                    how to model their behavior.
-                  </div>
-                  <div className="label">How It Supports POP</div>
-                  <div>
-                    <strong>Gives the theoretical foundation</strong> for understanding bubble 
-                    dynamics and dimensionless groups. It provides the background knowledge needed 
-                    to understand why bubbles deform in wind and how to model their behavior.
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <h4>🔄 Viscous Deformation: Shear Flow Analysis</h4>
-                <div className="kv small">
-                  <div className="label">Rallison, J. M. (1984)</div>
-                  <div>
-                    The deformation of small viscous drops and bubbles in shear flows. 
-                    <em>Annual Review of Fluid Mechanics</em>, 16, 45–66.
-                    <br/>
-                    <a href="https://doi.org/10.1146/annurev.fl.16.010184.000401" target="_blank" rel="noopener" className="btn small">
-                      🔗 View Paper
-                    </a>
-                  </div>
-                  <div className="label">Plain English Summary</div>
-                  <div>
-                    Rallison's review explains how viscosity affects bubble deformation in 
-                    flowing fluids. This is crucial for understanding why bubbles don't 
-                    instantly respond to wind changes but instead relax over time, which 
-                    POP models with the relaxation time τ.
-                  </div>
-                  <div className="label">How It Supports POP</div>
-                  <div>
-                    <strong>Explains the time-dependent behavior</strong> that POP models with 
-                    relaxation dynamics. It helps understand why bubbles don't instantly respond 
-                    to wind changes but relax over time.
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <h4>🧼 Soap Film Physics: Recent Advances</h4>
-                <div className="kv small">
-                  <div className="label">Rao, R. et al. (2024)</div>
-                  <div>
-                    Dynamics of soap bubble inflation. 
-                    <em>Physical Review Fluids</em>, 9, L051602.
-                    <br/>
-                    <a href="https://doi.org/10.1103/PhysRevFluids.9.L051602" target="_blank" rel="noopener" className="btn small">
-                      🔗 View Paper
-                    </a>
-                  </div>
-                  <div className="label">Plain English Summary</div>
-                  <div>
-                    This recent paper studies how soap bubbles form and inflate, providing 
-                    insights into the detachment process and initial shape formation. It helps 
-                    explain why wand motion affects bubble shape and how to model the 
-                    launch dynamics.
-                  </div>
-                  <div className="label">How It Supports POP</div>
-                  <div>
-                    <strong>Provides insights into bubble formation</strong> and wand interaction 
-                    effects. It helps explain why wand motion affects bubble shape and how to 
-                    model the launch dynamics.
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <h4>💧 Thin Film Dynamics: Drainage & Stability</h4>
-                <div className="kv small">
-                  <div className="label">Chatzigiannakis, E. et al. (2021)</div>
-                  <div>
-                    Thin liquid films: a review. 
-                    <em>Current Opinion in Colloid & Interface Science</em>, 56, 101461.
-                    <br/>
-                    <a href="https://doi.org/10.1016/j.cocis.2021.101461" target="_blank" rel="noopener" className="btn small">
-                      🔗 View Paper
-                    </a>
-                  </div>
-                  <div className="label">Plain English Summary</div>
-                  <div>
-                    This review covers how thin liquid films (like bubble walls) behave, 
-                    including drainage, stability, and rupture. Understanding these processes 
-                    helps explain bubble lifetime and why some bubbles pop while others 
-                    survive longer in the wind.
-                  </div>
-                  <div className="label">How It Supports POP</div>
-                  <div>
-                    <strong>Helps understand bubble stability</strong> and lifetime in various 
-                    conditions. It explains why some bubbles pop while others survive longer, 
-                    which affects the analysis window.
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <h4>📊 Physical Constants: Air Properties</h4>
-                <div className="kv small">
-                  <div className="label">Lide, D. R. (2004)</div>
-                  <div>
-                    <em>CRC Handbook of Chemistry and Physics</em>. CRC Press.
-                    <br/>
-                    <a href="https://www.routledge.com/CRC-Handbook-of-Chemistry-and-Physics-85th-Edition/Lide/p/book/9780849304859" target="_blank" rel="noopener" className="btn small">
-                      🔗 View Book
-                    </a>
-                  </div>
-                  <div className="label">Plain English Summary</div>
-                  <div>
-                    This reference provides the physical constants used in POP's calculations, 
-                    including air density (ρ ≈ 1.2 kg/m³), viscosity (μ ≈ 1.8×10⁻⁵ Pa·s), 
-                    and how these vary with temperature and humidity.
-                  </div>
-                  <div className="label">How It Supports POP</div>
-                  <div>
-                    <strong>Supplies the physical constants</strong> needed for accurate 
-                    calculations. It provides the values for air density, viscosity, and 
-                    how these vary with environmental conditions.
-                  </div>
-                </div>
-              </div>
-            </div>
+              </Drawer>
+            ))}
           </Card>
         </div>
       </main>
@@ -325,4 +148,3 @@ export default function App() {
     </>
   )
 }
-

@@ -339,10 +339,21 @@ const WandEditor = memo(function WandEditor({ points, onChange, width=720, heigh
     return Math.sqrt(dx * dx + dy * dy)
   }, [])
 
+  // Map a pointer event to canvas-internal coordinates, accounting for CSS
+  // scaling (the canvas is often displayed smaller than its 720×180 backing
+  // store, especially on phones), so drags land where you touch.
+  const toCanvasXY = useCallback((ev) => {
+    const c = canvasRef.current
+    const r = c.getBoundingClientRect()
+    const scaleX = c.width / r.width
+    const scaleY = c.height / r.height
+    return { x: (ev.clientX - r.left) * scaleX, y: (ev.clientY - r.top) * scaleY }
+  }, [])
+
   const onDown = useCallback((ev) => {
-    const r = canvasRef.current.getBoundingClientRect()
-    const x = ev.clientX - r.left, y = ev.clientY - r.top
-    
+    const { x, y } = toCanvasXY(ev)
+    canvasRef.current.setPointerCapture?.(ev.pointerId)
+
     // Check if clicking on a wand
     for (let i = 0; i < points.length; i++) {
       const point = points[i]
@@ -376,14 +387,13 @@ const WandEditor = memo(function WandEditor({ points, onChange, width=720, heigh
     if (ev.ctrlKey || ev.metaKey) {
       addStringPointAtLocation(x, y)
     }
-  }, [points, addStringPointAtLocation])
+  }, [points, addStringPointAtLocation, toCanvasXY])
 
   const onMove = useCallback((ev) => {
     if (dragIdx === null || !isDragging) return
-    
-    const r = canvasRef.current.getBoundingClientRect()
-    const x = ev.clientX - r.left, y = ev.clientY - r.top
-    
+
+    const { x, y } = toCanvasXY(ev)
+
     // Constrain to canvas bounds
     const clampedX = Math.max(10, Math.min(width - 10, x))
     const clampedY = Math.max(10, Math.min(height - 10, y))
@@ -399,7 +409,7 @@ const WandEditor = memo(function WandEditor({ points, onChange, width=720, heigh
     
     onChange(np)
     ev.preventDefault()
-  }, [dragIdx, dragType, isDragging, points, onChange, width, height])
+  }, [dragIdx, dragType, isDragging, points, onChange, width, height, toCanvasXY])
 
   const onUp = useCallback((ev) => {
     setDragIdx(null)
@@ -411,23 +421,23 @@ const WandEditor = memo(function WandEditor({ points, onChange, width=720, heigh
   return (
     <div className="stack">
       <div className="controls" style={{gap: 8}}>
-        <span className="badge">✨ Beautiful Wand & String Editor</span>
         <button className="btn" onClick={addStringPoint}>➕ Add string point</button>
         <button className="btn" onClick={removeLastStringPoint}>➖ Remove string point</button>
         <button className="btn" onClick={resetWandSetup}>🔁 Reset wands</button>
       </div>
-      <canvas 
-        ref={canvasRef} 
-        width={width} 
+      <canvas
+        ref={canvasRef}
+        width={width}
         height={height}
-        onMouseDown={onDown} 
-        onMouseMove={onMove} 
-        onMouseUp={onUp} 
-        onMouseLeave={onUp}
-        style={{ 
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        style={{
           cursor: isDragging ? 'grabbing' : 'crosshair',
           borderRadius: '8px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          touchAction: 'none'
         }}
       />
       <div className="small">
