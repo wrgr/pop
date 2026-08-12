@@ -13,6 +13,8 @@ h1{font-weight:800; letter-spacing:.2px; margin:0; font-size:1.6rem}
 main{max-width:1140px; margin:20px auto; padding:0 18px 44px}
 .grid{display:grid; grid-template-columns: 1fr; gap:18px}
 @media(min-width:980px){.grid{grid-template-columns: 1.2fr .8fr}}
+@media(min-width:980px){.span-2{grid-column:1 / -1}}
+.pill input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent)}
 
 /* Professional Card Styling */
 .card{position:relative;background:rgba(255,255,255,.95);backdrop-filter:blur(12px);border-radius:16px;border:1px solid rgba(255,255,255,0.3);box-shadow:0 8px 32px rgba(18,34,51,.08), 0 2px 8px rgba(18,34,51,.04);overflow:hidden;transition:all .3s ease}
