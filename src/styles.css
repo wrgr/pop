@@ -73,3 +73,16 @@ canvas, video, img{max-width:100%; height:auto; border-radius:12px; border:1px d
 
 code,.eq{background:#f4f7fb;padding:3px 6px;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.9rem}
 .eq{display:inline-block;margin:4px 0}
+
+/* Collapsible drawer (native <details>) */
+.drawer{border:1px solid #e3eaf3; border-radius:12px; background:#fbfdff; overflow:hidden}
+.drawer + .drawer{margin-top:12px}
+.drawer > summary{list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; font-weight:600; color:var(--ink); user-select:none}
+.drawer > summary::-webkit-details-marker{display:none}
+.drawer > summary:hover{background:#f4f9ff}
+.drawer > summary:focus-visible{outline:2px solid var(--accent2); outline-offset:-2px}
+.drawer-chevron{transition:transform .2s ease; color:var(--ink2); font-size:0.9rem}
+.drawer[open] > summary .drawer-chevron{transform:rotate(90deg)}
+.drawer-body{padding:0 18px 18px}
+.drawer[open] > summary{border-bottom:1px solid #eef3f9}
+.drawer .drawer-body > .stack:first-child{padding-top:16px}
