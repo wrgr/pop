@@ -118,6 +118,7 @@ const BubblePhysics = memo(function BubblePhysics() {
   // Humidity (0 dry … 1 humid) -> evaporative thinning (nm/s); drier evaporates faster.
   const evaporationFromHumidity = (h) => 34 - 26 * h
   const DRAINAGE = 220 // gravity-drainage speed of the wall at 1 µm (nm/s)
+  const WIND_THINNING = 0.14 // convective-evaporation gain: airflow across the film speeds evaporation ∝ √(slip)
 
   // Resolve the newborn bubble's {R, squash, tilt} from the chosen launcher.
   // 'custom' reads the hand-drawn loop; the others use the analytic model.
@@ -191,12 +192,11 @@ const BubblePhysics = memo(function BubblePhysics() {
     // ring signature.
     const cfg = { R: p.R, kSpring: p.kSpring, kPressure: p.kPressure, mass: massFromFilm(p.film) }
     const ring = ringSignature(cfg)
-    // Time the film draining in still air — the real "how long does it last?".
-    const lifetimeS = bubbleLifetime(cfg, {
-      thickness: thicknessFromFilm(p.film),
-      drainage: DRAINAGE,
-      evaporation: evaporationFromHumidity(p.humidity),
-    })
+    // Time the film draining — both the still-air baseline and the life it
+    // actually gets in the wind it flew in (convective evaporation shortens it).
+    const lifeOpts = { thickness: thicknessFromFilm(p.film), drainage: DRAINAGE, evaporation: evaporationFromHumidity(p.humidity) }
+    const lifetimeS = bubbleLifetime(cfg, lifeOpts)
+    const lifetimeWindS = bubbleLifetime(cfg, { ...lifeOpts, windMs: p.windSpeed, windThinning: WIND_THINNING })
     const obs = {
       diameterCm: p.R * 0.28, // nominal px→cm for display
       windMs: p.windSpeed,
@@ -206,6 +206,7 @@ const BubblePhysics = memo(function BubblePhysics() {
       spinRate: rep.spinning ? rep.spinRate : p.spin,
       ring,
       lifetimeS,
+      lifetimeWindS,
     }
 
     setReport({
@@ -417,6 +418,7 @@ const BubblePhysics = memo(function BubblePhysics() {
           spin: p.spin,
           drainage: DRAINAGE,
           evaporation: evaporationFromHumidity(p.humidity),
+          windThinning: WIND_THINNING,
         })
 
         // Publish the current shape for the 3D view (and reuse for recycling).

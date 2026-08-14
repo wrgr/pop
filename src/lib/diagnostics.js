@@ -8,9 +8,11 @@
  *
  * The advice is built on the established dimensionless groups rather than the
  * soft-body engine's tuning, because the engine is deliberately stiff in the
- * everyday 2–8 m/s range (it barely deforms, and — a real model gap — its fall
- * speed is mass-independent and it has no film-drainage lifetime). Those gaps are
- * surfaced explicitly as `MODEL_GAPS`: the next hypotheses worth adding.
+ * everyday 2–8 m/s range (it barely deforms). The film's *lifetime*, though, is
+ * now a real modelled quantity — the wall drains, evaporates, and (with wind)
+ * loses water convectively until it ruptures — so "how long will it last?" is
+ * measured, not guessed. The effects still missing are surfaced explicitly as
+ * `MODEL_GAPS`: the next hypotheses worth adding.
  *
  *   We = ρ U² R / σ   (aerodynamic stress vs. surface tension — deformation & pop)
  *   Bo = ρ g R² / σ   (gravity vs. surface tension — sag & size limit)
@@ -61,15 +63,22 @@ export function windCoupling(cfg, windMs, { pxPerMs = 26 } = {}) {
 }
 
 /**
- * Bubble lifetime (seconds): fly a bubble with a draining wall in still air and
- * time how long until it ruptures. Now that the engine thins the film, this is a
- * real, measured quantity — the answer to "how long will it last?".
+ * Bubble lifetime (seconds): fly a bubble with a draining wall and time how long
+ * until it ruptures. In still air (windMs 0) this is the film's baseline life;
+ * pass a windMs (and windThinning) to measure how much a real breeze cuts it —
+ * moving air sweeps the humid boundary layer off the film and speeds evaporation.
+ * Either way it's a real, measured quantity — the answer to "how long will it
+ * last?".
  */
-export function bubbleLifetime(cfg, { thickness = 1000, drainage = 220, evaporation = 18, cap = 120 } = {}) {
+export function bubbleLifetime(
+  cfg,
+  { thickness = 1000, drainage = 220, evaporation = 18, windMs = 0, windThinning = 0, cap = 120, pxPerMs = 26 } = {},
+) {
   const b = createBubble({ R: cfg.R || 70, n: 56, thickness })
   const dt = 1 / 60
+  const wx = windMs * pxPerMs
   for (let t = 0; t < cap; t += dt) {
-    step(b, dt, { windX: 0, windY: 0, gravity: 10, mass: cfg.mass || 1, drainage, evaporation })
+    step(b, dt, { windX: wx, windY: 0, gravity: 10, mass: cfg.mass || 1, drainage, evaporation, windThinning })
     if (b.popped) return t
   }
   return cap
@@ -100,7 +109,6 @@ export const GOALS = [
 // (Film drainage & evaporation are now modelled, so "how long does it last?"
 // is a measured quantity — see bubbleLifetime.)
 export const MODEL_GAPS = [
-  "Wind's effect on lifetime is weak here: the thinning only speeds up with visible deformation, and the film barely deforms in a normal breeze — so a real gust probably shortens life more than POP shows.",
   'Buoyancy vs. film weight: POP\'s fall speed is currently mass-independent, so "floaty vs. heavy" can\'t be read from it — adding real film mass & buoyancy would fix that.',
   'Surfactant (Marangoni) elasticity: surface-tension gradients stiffen the film dynamically and likely explain why some mixes are far sturdier — and why conditioned mixes drain slower.',
   'Marginal regeneration & temperature: real drainage is patchy and temperature-dependent; POP uses a smooth, uniform thinning law.',
@@ -132,16 +140,21 @@ export function coachBubble(obs, goalKey) {
       { title: 'Keep the wind low & smooth', control: 'Wind / Gust', why: `Aerodynamic stress We = ρU²R/σ rises with size; big bubbles distort and pop first (We ≈ ${We.toFixed(2)} now).` },
     ]
   } else if (goalKey === 'longer') {
-    const life = o.lifetimeS // measured seconds-to-rupture, if provided
-    score = clamp(life != null ? (life / 30) * 100 : 70 - o.windMs * 8) // 30 s ≈ "long"
+    const life = o.lifetimeS // measured still-air seconds-to-rupture, if provided
+    const lifeWind = o.lifetimeWindS // measured seconds in the observed wind, if provided
+    const scoreLife = lifeWind != null ? lifeWind : life // score the life it actually gets
+    score = clamp(scoreLife != null ? (scoreLife / 30) * 100 : 70 - o.windMs * 8) // 30 s ≈ "long"
+    const windCost = life != null && lifeWind != null ? Math.max(0, Math.round((1 - lifeWind / Math.max(life, 1e-6)) * 100)) : 0
     summary =
-      life != null
-        ? `POP flew it in still air and timed the wall draining: it lasts ≈ ${life.toFixed(0)} s before rupturing. Thickness and dryness are the big levers.`
-        : `The film's drainage sets its life — thicker, conditioned films in humid air last far longer.`
+      lifeWind != null && life != null
+        ? `POP timed the wall draining: ≈ ${life.toFixed(0)} s in still air, but only ≈ ${lifeWind.toFixed(0)} s in this ${o.windMs.toFixed(1)} m/s wind (${windCost}% shorter) — moving air sweeps the humid layer off the film and speeds evaporation. Thickness, dryness and calm air are the big levers.`
+        : life != null
+          ? `POP flew it in still air and timed the wall draining: it lasts ≈ ${life.toFixed(0)} s before rupturing. Thickness and dryness are the big levers.`
+          : `The film's drainage sets its life — thicker, conditioned films in humid air last far longer.`
     levers = [
       { title: 'Thicken & condition the film (add glycerin)', control: 'Film (µm)', why: 'The wall drains and evaporates until it ruptures — a thicker, conditioned film starts further from the limit and drains slower. The single biggest lever.' },
       { title: 'Move to more humid air', control: 'Humidity', why: 'Dry air evaporates the wall faster; humidity slows it and directly extends the timed life.' },
-      { title: 'Keep the wind calm', control: 'Wind', why: 'Wind stress and drift shorten a bubble\'s visible life (and deformation speeds thinning).' },
+      { title: 'Get it out of the wind — or let it ride with the breeze', control: 'Wind', why: `Wind only drains the film while air is moving across it: a bubble carried along with a steady breeze feels almost none, but a gust it can't keep up with sweeps water off fast${windCost ? ` (worth ≈ ${windCost}% of its life here)` : ''}.` },
       { title: 'Pick a moderate size', control: 'Size', why: 'Very large films drain and sag quickly; a mid size lasts longer while still looking good.' },
     ]
   } else if (goalKey === 'faster') {

@@ -243,7 +243,8 @@ export function step(state, dt, p = {}) {
     substeps = 4,
     // Film lifetime (only active when the bubble carries a `thickness`):
     drainage = 0, // gravity-drainage speed of the wall at 1 µm (nm/s); thicker drains faster
-    evaporation = 0, // steady evaporative thinning (nm/s); higher in dry air
+    evaporation = 0, // steady (still-air) evaporative thinning (nm/s); higher in dry air
+    windThinning = 0, // convective-evaporation gain: airflow over the film boosts evaporation ∝ √(slip)
     critThickness = 60, // wall ruptures below this thickness (nm) — the "black film" limit
   } = p
 
@@ -417,7 +418,26 @@ export function step(state, dt, p = {}) {
   // quantity — the dominant driver of "how long does it last?".
   if (state.thickness != null && (drainage > 0 || evaporation > 0)) {
     const hRel = state.thickness / 1000 // relative to 1 µm
-    const rate = (drainage * hRel * hRel + evaporation) * (1 + 0.5 * m.D)
+    // Convective evaporation: the film only loses water where the surrounding
+    // air isn't already saturated, so wind matters by *sweeping that humid
+    // boundary layer away*. The enhancement follows a boundary-layer √(airspeed)
+    // law in the slip between the bubble and the air (|wind − drift|): a bubble
+    // perfectly carried by a steady breeze feels no wind on its face and lives
+    // its still-air life, while one that lags — or sits in a gust it never
+    // catches — evaporates far faster. It multiplies evaporation (not drainage):
+    // in saturated/humid air there's nothing for the wind to carry off.
+    let conv = 1
+    const wmag = Math.hypot(windX, windY)
+    if (windThinning > 0 && evaporation > 0 && wmag > 1e-6) {
+      const d = driftVelocity(state)
+      // Airspeed the wind imposes across the film = the slip projected onto the
+      // wind axis. The bubble's gravitational descent is (for a horizontal wind)
+      // perpendicular to that axis, so it stays part of the still-air baseline
+      // rather than being miscounted as wind: at zero wind, conv = 1 exactly.
+      const slip = Math.abs(((windX - d.vx) * windX + (windY - d.vy) * windY) / wmag)
+      conv = 1 + windThinning * Math.sqrt(slip)
+    }
+    const rate = (drainage * hRel * hRel + evaporation * conv) * (1 + 0.5 * m.D)
     state.thickness -= rate * dt
     if (!state.popped && state.thickness <= critThickness) {
       state.popped = true

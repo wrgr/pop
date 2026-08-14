@@ -57,6 +57,22 @@ test('bubbleLifetime is finite and grows with film thickness', () => {
   assert.ok(thick > thin, `thicker film lasts longer: ${thin} vs ${thick}`)
 })
 
+test('wind shortens the measured lifetime (convective evaporation)', () => {
+  const still = bubbleLifetime({ R: 70 }, { thickness: 1000 })
+  const windy = bubbleLifetime({ R: 70 }, { thickness: 1000, windMs: 5, windThinning: 0.14 })
+  assert.ok(windy < still, `wind should cut the measured life: still=${still} windy=${windy}`)
+})
+
+test('the longer-lasting coach quantifies the wind cost when it flew in wind', () => {
+  const r = coachBubble({ diameterCm: 20, windMs: 4, lifetimeS: 14, lifetimeWindS: 9 }, 'longer')
+  assert.match(r.summary, /still air/)
+  assert.match(r.summary, /9 s|≈ 9/)
+  assert.match(r.summary, /\d+% shorter/)
+  // The score reflects the life it actually gets in the wind, not the still-air ideal.
+  const calmer = coachBubble({ diameterCm: 20, windMs: 4, lifetimeS: 14, lifetimeWindS: 13 }, 'longer')
+  assert.ok(calmer.score > r.score, 'less wind loss should score higher')
+})
+
 test('the longer-lasting coach uses the measured lifetime', () => {
   const shortLived = coachBubble({ diameterCm: 20, windMs: 2, lifetimeS: 6 }, 'longer')
   const longLived = coachBubble({ diameterCm: 20, windMs: 2, lifetimeS: 28 }, 'longer')
