@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { groups, coachBubble, ringSignature, GOALS, MODEL_GAPS } from '../src/lib/diagnostics.js'
+import { groups, coachBubble, ringSignature, bubbleLifetime, GOALS, MODEL_GAPS } from '../src/lib/diagnostics.js'
 
 test('Weber & Bond grow with wind and size', () => {
   const base = groups({ diameterCm: 12, windMs: 3, sigma: 0.03 })
@@ -48,4 +48,19 @@ test('the ring signature separates a thin (ringing) film from a thick one', () =
 
 test('model gaps are surfaced as hypotheses', () => {
   assert.ok(MODEL_GAPS.length >= 3 && MODEL_GAPS.every((s) => typeof s === 'string'))
+})
+
+test('bubbleLifetime is finite and grows with film thickness', () => {
+  const thin = bubbleLifetime({ R: 70 }, { thickness: 500 })
+  const thick = bubbleLifetime({ R: 70 }, { thickness: 2500 })
+  assert.ok(thin > 0 && isFinite(thin))
+  assert.ok(thick > thin, `thicker film lasts longer: ${thin} vs ${thick}`)
+})
+
+test('the longer-lasting coach uses the measured lifetime', () => {
+  const shortLived = coachBubble({ diameterCm: 20, windMs: 2, lifetimeS: 6 }, 'longer')
+  const longLived = coachBubble({ diameterCm: 20, windMs: 2, lifetimeS: 28 }, 'longer')
+  assert.ok(longLived.score > shortLived.score, 'a longer measured life scores higher')
+  assert.match(shortLived.summary, /\b6 s\b|≈ 6/)
+  assert.match((shortLived.levers.map((l) => l.control + ' ' + l.why).join(' ')).toLowerCase(), /humid|film|drain/)
 })

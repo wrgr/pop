@@ -60,6 +60,21 @@ export function windCoupling(cfg, windMs, { pxPerMs = 26 } = {}) {
   return wx > 1e-6 ? Math.max(0, Math.min(1, d.vx / wx)) : 0
 }
 
+/**
+ * Bubble lifetime (seconds): fly a bubble with a draining wall in still air and
+ * time how long until it ruptures. Now that the engine thins the film, this is a
+ * real, measured quantity — the answer to "how long will it last?".
+ */
+export function bubbleLifetime(cfg, { thickness = 1000, drainage = 220, evaporation = 18, cap = 120 } = {}) {
+  const b = createBubble({ R: cfg.R || 70, n: 56, thickness })
+  const dt = 1 / 60
+  for (let t = 0; t < cap; t += dt) {
+    step(b, dt, { windX: 0, windY: 0, gravity: 10, mass: cfg.mass || 1, drainage, evaporation })
+    if (b.popped) return t
+  }
+  return cap
+}
+
 // ---- dimensionless groups from an observation (physical, in SI-ish units) ----
 
 /**
@@ -82,11 +97,13 @@ export const GOALS = [
 ]
 
 // Effects the live engine does NOT capture yet — the hypotheses to add next.
+// (Film drainage & evaporation are now modelled, so "how long does it last?"
+// is a measured quantity — see bubbleLifetime.)
 export const MODEL_GAPS = [
-  'Lifetime / film drainage: real bubbles pop from the wall thinning and draining under gravity, not from wind alone. This is the single biggest driver of "longer-lasting" and POP does not simulate it yet.',
-  'Evaporation & humidity: dry air thins the film faster; humidity should extend life. Untracked.',
+  "Wind's effect on lifetime is weak here: the thinning only speeds up with visible deformation, and the film barely deforms in a normal breeze — so a real gust probably shortens life more than POP shows.",
   'Buoyancy vs. film weight: POP\'s fall speed is currently mass-independent, so "floaty vs. heavy" can\'t be read from it — adding real film mass & buoyancy would fix that.',
-  'Surfactant (Marangoni) elasticity: surface-tension gradients stiffen the film dynamically and likely explain why some mixes are far sturdier.',
+  'Surfactant (Marangoni) elasticity: surface-tension gradients stiffen the film dynamically and likely explain why some mixes are far sturdier — and why conditioned mixes drain slower.',
+  'Marginal regeneration & temperature: real drainage is patchy and temperature-dependent; POP uses a smooth, uniform thinning law.',
 ]
 
 /**
@@ -115,14 +132,18 @@ export function coachBubble(obs, goalKey) {
       { title: 'Keep the wind low & smooth', control: 'Wind / Gust', why: `Aerodynamic stress We = ρU²R/σ rises with size; big bubbles distort and pop first (We ≈ ${We.toFixed(2)} now).` },
     ]
   } else if (goalKey === 'longer') {
-    score = clamp(70 - o.windMs * 8) // calmer air ⇒ longer
-    summary = `The wind it's in (≈ ${o.windMs.toFixed(1)} m/s) and the film's drainage set its life. Lifetime is dominated by the wall thinning — which POP doesn't yet simulate.`
+    const life = o.lifetimeS // measured seconds-to-rupture, if provided
+    score = clamp(life != null ? (life / 30) * 100 : 70 - o.windMs * 8) // 30 s ≈ "long"
+    summary =
+      life != null
+        ? `POP flew it in still air and timed the wall draining: it lasts ≈ ${life.toFixed(0)} s before rupturing. Thickness and dryness are the big levers.`
+        : `The film's drainage sets its life — thicker, conditioned films in humid air last far longer.`
     levers = [
-      { title: 'Thicken & condition the film (add glycerin)', control: 'Film', why: 'Lifetime is set by drainage and evaporation — thicker, conditioned films drain far slower. This is the biggest lever and the one the live model does not capture.' },
-      { title: 'Move to calmer, more humid air', control: 'Wind', why: 'Wind stress and dry air thin and rupture the wall; humidity slows evaporation.' },
+      { title: 'Thicken & condition the film (add glycerin)', control: 'Film (µm)', why: 'The wall drains and evaporates until it ruptures — a thicker, conditioned film starts further from the limit and drains slower. The single biggest lever.' },
+      { title: 'Move to more humid air', control: 'Humidity', why: 'Dry air evaporates the wall faster; humidity slows it and directly extends the timed life.' },
+      { title: 'Keep the wind calm', control: 'Wind', why: 'Wind stress and drift shorten a bubble\'s visible life (and deformation speeds thinning).' },
       { title: 'Pick a moderate size', control: 'Size', why: 'Very large films drain and sag quickly; a mid size lasts longer while still looking good.' },
     ]
-    caveat = 'POP has no drainage/evaporation model yet, so it can\'t simulate lifetime directly — this advice is from the established film physics.'
   } else if (goalKey === 'faster') {
     score = clamp(o.windMs * 12 + (o.diameterCm < 12 ? 20 : 0))
     summary = `A bubble travels at the wind speed minus its slip. It's in ≈ ${o.windMs.toFixed(1)} m/s of wind; smaller, lighter bubbles couple to the flow soonest.`

@@ -240,3 +240,36 @@ test('spin conserves the shape (a round bubble stays round while spinning)', () 
   settle(b, 0.6, { windX: 0, windY: 0, gravity: 0, spin: 4 })
   assert.ok(measure(b).D < 0.03, 'pure spin should not deform a round bubble')
 })
+
+// --- Film lifetime (drainage & evaporation) ---
+
+// Seconds until the wall ruptures in still air.
+function lifetime(opts, cap = 120) {
+  const b = createBubble({ R: opts.R || 70, n: 56, thickness: opts.thickness })
+  const dt = 1 / 60
+  for (let t = 0; t < cap; t += dt) {
+    step(b, dt, { windX: 0, windY: 0, gravity: 10, drainage: opts.drainage ?? 220, evaporation: opts.evaporation ?? 18 })
+    if (b.popped) return { t, reason: b.popReason }
+  }
+  return { t: Infinity, reason: null }
+}
+
+test('a filmed bubble drains and ruptures on its own', () => {
+  const r = lifetime({ thickness: 800 })
+  assert.ok(isFinite(r.t) && r.t > 0.5, `should live a bit then pop: ${r.t}`)
+  assert.equal(r.reason, 'drained')
+})
+
+test('a thicker film lasts longer', () => {
+  assert.ok(lifetime({ thickness: 2500 }).t > lifetime({ thickness: 500 }).t)
+})
+
+test('drier air (more evaporation) shortens the life', () => {
+  assert.ok(lifetime({ thickness: 1000, evaporation: 34 }).t < lifetime({ thickness: 1000, evaporation: 8 }).t)
+})
+
+test('without a thickness there is no drainage (unchanged behaviour)', () => {
+  const b = createBubble({ R: 70, n: 56 }) // thickness null
+  settle(b, 3, { windX: 0, windY: 0, gravity: 10, drainage: 500, evaporation: 500 })
+  assert.equal(b.popped, false, 'no thickness ⇒ drainage does nothing')
+})
