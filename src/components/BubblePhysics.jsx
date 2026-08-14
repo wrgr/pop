@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo, memo } from '
 import { createBubble, step, measure, driftVelocity, launchGeometry } from '../lib/engine.js'
 import { weberFromDeformation } from '../lib/inference.js'
 import { analyzeSeries } from '../lib/forensics.js'
+import { coachBubble, ringSignature, GOALS, MODEL_GAPS } from '../lib/diagnostics.js'
 import { computeMouthStats, calculateLoopArea } from '../lib/physics.js'
 import WandEditor from './WandEditor.jsx'
 import Drawer from './Drawer.jsx'
@@ -77,6 +78,7 @@ const BubblePhysics = memo(function BubblePhysics() {
   const [showField, setShowField] = useState(true)
   const [readout, setReadout] = useState(null)
   const [report, setReport] = useState(null)
+  const [goal, setGoal] = useState('harder') // coach objective: bigger|longer|faster|harder
   const [view, setView] = useState('2d') // '2d' canvas | '3d' three.js
   const [wand, setWand] = useState([]) // custom wand/loop control points (WandEditor)
   const wandRef = useRef(wand)
@@ -176,9 +178,25 @@ const BubblePhysics = memo(function BubblePhysics() {
       if (b.popped) break
     }
     const rep = analyzeSeries(frames, { pxPerMs: PX_PER_MS, kCal: K_CAL })
+
+    // Characterise the recorded bubble for the coach: an approximate display
+    // diameter (px→cm), the wind it flew in, its launcher, and a measured film
+    // ring signature.
+    const ring = ringSignature({ R: p.R, kSpring: p.kSpring, kPressure: p.kPressure, mass: massFromFilm(p.film) })
+    const obs = {
+      diameterCm: p.R * 0.28, // nominal px→cm for display
+      windMs: p.windSpeed,
+      sigma: 0.03,
+      launcher: p.launcher,
+      filmUm: p.film,
+      spinRate: rep.spinning ? rep.spinRate : p.spin,
+      ring,
+    }
+
     setReport({
       ...rep,
       nFrames: frames.length,
+      obs,
       truth: {
         windSpeed: p.windSpeed, windDir: p.windDir, launcher: p.launcher,
         film: p.film, spin: p.spin, bond: p.bond,
@@ -443,6 +461,7 @@ const BubblePhysics = memo(function BubblePhysics() {
   const set = useCallback((k, v) => setParams((prev) => ({ ...prev, [k]: v })), [])
 
   const areaPct = readout ? (readout.area / readout.restArea) * 100 : 100
+  const plan = report && report.obs ? coachBubble(report.obs, goal) : null
 
   return (
     <div className="stack">
@@ -729,6 +748,52 @@ const BubblePhysics = memo(function BubblePhysics() {
               distinct <em>time signatures</em> (steady drift, curvature, a fading imprint, a rotating
               tilt) pull them apart. That's POP's whole premise, run backwards.
             </div>
+
+            {plan && (
+              <div className="card" style={{ margin: 0 }}>
+                <h4 style={{ marginTop: 0 }}>🎯 Coach — how to do "better"</h4>
+                <p className="small" style={{ marginTop: 0 }}>Pick what "better" means, and POP reads this bubble and ranks the levers.</p>
+                <div className="controls" style={{ gap: 8, borderTop: 'none', padding: 0, marginBottom: 12 }}>
+                  {GOALS.map((g) => (
+                    <button
+                      key={g.key}
+                      className={`btn small ${goal === g.key ? 'primary' : 'ghost'}`}
+                      onClick={() => setGoal(g.key)}
+                    >
+                      {g.icon} {g.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="kv small" style={{ marginBottom: 12 }}>
+                  <div className="label">{plan.goal.icon} {plan.goal.label} — where it stands</div>
+                  <div>
+                    <div style={{ height: 8, borderRadius: 999, background: 'var(--line)', overflow: 'hidden', maxWidth: 240 }}>
+                      <div style={{ width: `${plan.score}%`, height: '100%', background: 'var(--accent)' }} />
+                    </div>
+                    <span className="small" style={{ color: 'var(--ink2)' }}>{plan.score}/100 · {plan.summary}</span>
+                  </div>
+                </div>
+                <ol style={{ margin: 0, paddingLeft: 20 }}>
+                  {plan.levers.map((l, i) => (
+                    <li key={i} style={{ marginBottom: 8 }}>
+                      <strong>{l.title}</strong>
+                      {l.control ? <span className="tag" style={{ marginLeft: 8 }}>{l.control}</span> : null}
+                      <div className="small" style={{ color: 'var(--ink2)', marginTop: 2 }}>{l.why}</div>
+                    </li>
+                  ))}
+                </ol>
+                {plan.caveat && (
+                  <p className="small" style={{ color: 'var(--warn)', marginBottom: 0 }}>⚠️ {plan.caveat}</p>
+                )}
+                <Drawer title="🔬 What POP doesn't model yet — the next hypotheses to add" className="">
+                  <ul className="small" style={{ margin: 0, paddingLeft: 20 }}>
+                    {MODEL_GAPS.map((h, i) => (
+                      <li key={i} style={{ marginBottom: 6 }}>{h}</li>
+                    ))}
+                  </ul>
+                </Drawer>
+              </div>
+            )}
           </div>
         )}
       </div>
