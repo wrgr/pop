@@ -34,7 +34,7 @@ const TWO_PI = Math.PI * 2
  * @param {number} opts.vx  Initial launch velocity x (px/s)
  * @param {number} opts.vy  Initial launch velocity y (px/s)
  */
-export function createBubble({ cx = 360, cy = 200, R = 70, n = 56, vx = 0, vy = 0, squash = 0, tilt = 0 } = {}) {
+export function createBubble({ cx = 360, cy = 200, R = 70, n = 56, vx = 0, vy = 0, squash = 0, tilt = 0, thickness = null } = {}) {
   // `squash` pre-deforms the ring into an ellipse: a real bubble pinches off the
   // launcher and is born already distorted, so with light damping it rings (its
   // Rayleigh–Lamb shape mode) as it relaxes. Area is preserved (stretch one
@@ -62,9 +62,12 @@ export function createBubble({ cx = 360, cy = 200, R = 70, n = 56, vx = 0, vy = 
     R0: R,
     restLen: (TWO_PI * R) / n,
     restArea: Math.PI * R * R,
+    // Film wall thickness (nm), if lifetime is being simulated; null = no drainage.
+    thickness,
     // Diagnostics filled in by measure(); handy for the UI.
     age: 0,
     popped: false,
+    popReason: null, // 'deformed' (over-stretched by wind) | 'drained' (film ruptured)
   }
 }
 
@@ -238,6 +241,10 @@ export function step(state, dt, p = {}) {
     damping = 0.9, // per-second velocity retention (air resistance/relaxation)
     mass = 1,
     substeps = 4,
+    // Film lifetime (only active when the bubble carries a `thickness`):
+    drainage = 0, // gravity-drainage speed of the wall at 1 µm (nm/s); thicker drains faster
+    evaporation = 0, // steady evaporative thinning (nm/s); higher in dry air
+    critThickness = 60, // wall ruptures below this thickness (nm) — the "black film" limit
   } = p
 
   if (state.popped) return state
@@ -402,7 +409,21 @@ export function step(state, dt, p = {}) {
   // Pop if the film is stretched past a plausible failure strain — a real
   // bubble bursts when the wind over-deforms it. Callers can watch state.popped.
   const m = measure(state)
-  if (m.D > 0.62) state.popped = true
+  if (m.D > 0.62) { state.popped = true; state.popReason = 'deformed' }
+
+  // Film lifetime: the wall thins as liquid drains (gravity, ∝ thickness²) and
+  // evaporates, and it ruptures once it reaches the black-film limit. Deformation
+  // speeds thinning. This is what makes a bubble's *lifetime* a real, tunable
+  // quantity — the dominant driver of "how long does it last?".
+  if (state.thickness != null && (drainage > 0 || evaporation > 0)) {
+    const hRel = state.thickness / 1000 // relative to 1 µm
+    const rate = (drainage * hRel * hRel + evaporation) * (1 + 0.5 * m.D)
+    state.thickness -= rate * dt
+    if (!state.popped && state.thickness <= critThickness) {
+      state.popped = true
+      state.popReason = 'drained'
+    }
+  }
 
   return state
 }

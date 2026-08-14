@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo, memo } from '
 import { createBubble, step, measure, driftVelocity, launchGeometry } from '../lib/engine.js'
 import { weberFromDeformation } from '../lib/inference.js'
 import { analyzeSeries } from '../lib/forensics.js'
-import { coachBubble, ringSignature, GOALS, MODEL_GAPS } from '../lib/diagnostics.js'
+import { coachBubble, ringSignature, bubbleLifetime, GOALS, MODEL_GAPS } from '../lib/diagnostics.js'
 import { computeMouthStats, calculateLoopArea } from '../lib/physics.js'
 import WandEditor from './WandEditor.jsx'
 import Drawer from './Drawer.jsx'
@@ -73,6 +73,7 @@ const BubblePhysics = memo(function BubblePhysics() {
     handleSep: 0.45, // string-loop handle separation (0 = round loop, 1 = long thin)
     wake: 0, // leeward wake suction — fore-aft asymmetry (bluff-body tail)
     spin: 0, // rigid rotation rate (rad/s) — a tumbling bubble
+    humidity: 0.5, // 0 = dry (fast evaporation) … 1 = humid (slow) — sets film lifetime
   })
   const [running, setRunning] = useState(true)
   const [showField, setShowField] = useState(true)
@@ -112,6 +113,11 @@ const BubblePhysics = memo(function BubblePhysics() {
   const sagFromBond = (bond, R) => Math.min(0.04, bond * 0.011 * (70 / R))
   // Film thickness (µm) -> node mass. Thicker film = heavier = slower ring.
   const massFromFilm = (film) => 0.5 + film * 0.6
+  // Film thickness (µm) -> initial wall thickness (nm) for the lifetime model.
+  const thicknessFromFilm = (film) => film * 1000
+  // Humidity (0 dry … 1 humid) -> evaporative thinning (nm/s); drier evaporates faster.
+  const evaporationFromHumidity = (h) => 34 - 26 * h
+  const DRAINAGE = 220 // gravity-drainage speed of the wall at 1 µm (nm/s)
 
   // Resolve the newborn bubble's {R, squash, tilt} from the chosen launcher.
   // 'custom' reads the hand-drawn loop; the others use the analytic model.
@@ -145,6 +151,7 @@ const BubblePhysics = memo(function BubblePhysics() {
       vy: -Math.abs(Math.sin(ang) * v) - 60, // slight upward kick
       squash: g.squash,
       tilt: g.tilt,
+      thickness: thicknessFromFilm(p.film), // starts draining immediately
     })
     tRef.current = 0
   }, [geometryFor])
@@ -182,7 +189,14 @@ const BubblePhysics = memo(function BubblePhysics() {
     // Characterise the recorded bubble for the coach: an approximate display
     // diameter (px→cm), the wind it flew in, its launcher, and a measured film
     // ring signature.
-    const ring = ringSignature({ R: p.R, kSpring: p.kSpring, kPressure: p.kPressure, mass: massFromFilm(p.film) })
+    const cfg = { R: p.R, kSpring: p.kSpring, kPressure: p.kPressure, mass: massFromFilm(p.film) }
+    const ring = ringSignature(cfg)
+    // Time the film draining in still air — the real "how long does it last?".
+    const lifetimeS = bubbleLifetime(cfg, {
+      thickness: thicknessFromFilm(p.film),
+      drainage: DRAINAGE,
+      evaporation: evaporationFromHumidity(p.humidity),
+    })
     const obs = {
       diameterCm: p.R * 0.28, // nominal px→cm for display
       windMs: p.windSpeed,
@@ -191,6 +205,7 @@ const BubblePhysics = memo(function BubblePhysics() {
       filmUm: p.film,
       spinRate: rep.spinning ? rep.spinRate : p.spin,
       ring,
+      lifetimeS,
     }
 
     setReport({
@@ -372,7 +387,8 @@ const BubblePhysics = memo(function BubblePhysics() {
     if (state.popped) {
       ctx.fillStyle = 'rgba(255,107,107,0.95)'
       ctx.font = '600 18px Poppins, system-ui, sans-serif'
-      ctx.fillText('pop! — over-deformed by the wind', m.centroid.x - 90, m.centroid.y - m.b - 14)
+      const label = state.popReason === 'drained' ? 'pop! — the wall drained out' : 'pop! — over-deformed by the wind'
+      ctx.fillText(label, m.centroid.x - 100, m.centroid.y - m.b - 14)
     }
   }, [currentWind])
 
@@ -399,6 +415,8 @@ const BubblePhysics = memo(function BubblePhysics() {
           mass: massFromFilm(p.film),
           wake: p.wake,
           spin: p.spin,
+          drainage: DRAINAGE,
+          evaporation: evaporationFromHumidity(p.humidity),
         })
 
         // Publish the current shape for the 3D view (and reuse for recycling).
@@ -446,6 +464,8 @@ const BubblePhysics = memo(function BubblePhysics() {
             film: p.film,
             launcher: p.launcher,
             age: state.age,
+            thickness: state.thickness,
+            thickness0: thicknessFromFilm(p.film),
             popped: state.popped,
           })
         }
@@ -570,7 +590,7 @@ const BubblePhysics = memo(function BubblePhysics() {
         </label>
       </div>
 
-      <Drawer title="⚙️ More parameters (bubble, gravity, film, wake, spin)">
+      <Drawer title="⚙️ More parameters (size, gravity, film, humidity, wake, spin)">
       <div className="controls" style={{ gap: 16 }}>
         <label className="pill" title="Bubble radius (px)">
           ⚪ Size
@@ -595,13 +615,18 @@ const BubblePhysics = memo(function BubblePhysics() {
           <input type="range" min="0" max="2.5" step="0.05" value={params.bond}
             onChange={(e) => set('bond', parseFloat(e.target.value))} /> {params.bond.toFixed(2)}
         </label>
-        <label className="pill" title="Soap-film thickness — sets membrane inertia (ring rate)">
+        <label className="pill" title="Soap-film thickness — sets ring rate and how long the wall lasts">
           🎞️ Film
           <input type="range" min="0.3" max="3" step="0.1" value={params.film}
             onChange={(e) => set('film', parseFloat(e.target.value))} /> {params.film.toFixed(1)} µm
         </label>
+        <label className="pill" title="Air humidity — dry air evaporates the wall faster (shorter life)">
+          💧 Humidity
+          <input type="range" min="0" max="1" step="0.05" value={params.humidity}
+            onChange={(e) => set('humidity', parseFloat(e.target.value))} /> {(params.humidity * 100).toFixed(0)}%
+        </label>
         <span className="small" style={{ alignSelf: 'center', color: 'var(--ink2)' }}>
-          Bo sags the bubble into a vertical stretch; a thicker film rings more slowly after launch.
+          A thicker film in humid air lasts far longer before the wall drains out and pops.
         </span>
       </div>
 
@@ -673,6 +698,16 @@ const BubblePhysics = memo(function BubblePhysics() {
           </div>
           <div className="label">Air-mass conservation</div>
           <div>{areaPct.toFixed(1)}% of rest area (pressure ↔ tension balance)</div>
+          {readout.thickness != null && (
+            <>
+              <div className="label">Film wall (draining)</div>
+              <div>
+                {Math.max(0, readout.thickness).toFixed(0)} nm ·{' '}
+                {((Math.max(0, readout.thickness) / readout.thickness0) * 100).toFixed(0)}% of start —
+                it thins until it ruptures
+              </div>
+            </>
+          )}
         </div>
       )}
 
