@@ -76,9 +76,8 @@ export default function App() {
           <div>
             <h1>POP — Phil's Orb Playground</h1>
             <div className="subtitle">
-              If you were able to accurately model shape of the bubble, could you
-              predict how the wind was blowing or the wands were held during
-              bubble launch?
+              If you could accurately model the shape of a bubble, could you predict
+              how the wind was blowing — or how the wands were held — during launch?
             </div>
           </div>
         </div>

@@ -440,17 +440,10 @@ const WandEditor = memo(function WandEditor({ points, onChange, width=720, heigh
           touchAction: 'none'
         }}
       />
-      <div className="small">
-        <p><strong>🎯 Instructions:</strong></p>
-        <ul>
-          <li>Drag the <strong>red wand handles</strong> to position them</li>
-          <li>Drag <strong>blue string points</strong> to shape the loop</li>
-          <li>Add/remove string points to control loop complexity</li>
-          <li>The string forms a <strong>smooth closed loop</strong> between the wands</li>
-          <li>String curves smoothly between control points like a real cord</li>
-          <li><strong>Ctrl+Click</strong> anywhere to add a new string point at that location</li>
-        </ul>
-        <p><strong>🔧 Status:</strong> {isDragging ? `Dragging ${dragType}` : 'Ready'} | Points: {points.length}</p>
+      <div className="small" style={{ color: 'var(--ink2)' }}>
+        Drag the <strong>red handles</strong> to move the wands and the <strong>blue points</strong> to
+        shape the loop; use <strong>Add / Remove point</strong> to change its complexity. On a desktop
+        you can also Ctrl-click the canvas to drop a new point where you click.
       </div>
     </div>
   )
