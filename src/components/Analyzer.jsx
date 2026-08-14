@@ -365,22 +365,6 @@ const Analyzer = memo(function Analyzer() {
     }
   }, [])
 
-  // Manual scale estimation with known object
-  const estimateScaleManually = useCallback(() => {
-    if (!img || !ellipse) return
-    
-    // For manual estimation, we'll use a simple approach
-    // User can draw a line on a known object and we'll calculate scale
-    const estimatedPxPerCm = 100 / knownObjectSize // Placeholder - would need user input
-    setScaleEstimate(estimatedPxPerCm)
-    
-    if (autoScaleEnabled) {
-      setScalePxPerCm(estimatedPxPerCm)
-    }
-    
-    return estimatedPxPerCm
-  }, [img, ellipse, knownObjectSize, autoScaleEnabled])
-
   // Memoize redraw function to prevent unnecessary re-renders
   const redraw = useCallback(() => {
     const c = canvasRef.current
@@ -454,18 +438,24 @@ const Analyzer = memo(function Analyzer() {
     }
   }
 
+  // Map a pointer event to canvas-internal coordinates, correcting for the CSS
+  // scale (the canvas is often displayed smaller than its 720×440 backing store).
+  function canvasXY(clientX, clientY) {
+    const c = canvasRef.current
+    const r = c.getBoundingClientRect()
+    return { x: ((clientX - r.left) * c.width) / r.width, y: ((clientY - r.top) * c.height) / r.height }
+  }
+
   function onCanvasDown(ev) {
     if (pickPts || isDrawingRef.current) return
-    
+
     isDrawingRef.current = true
-    const r = canvasRef.current.getBoundingClientRect()
-    const start = { x: ev.clientX - r.left, y: ev.clientY - r.top }
-    
+    const start = canvasXY(ev.clientX, ev.clientY)
+
     function move(e) {
       if (!isDrawingRef.current) return
-      
-      const xx = e.clientX - r.left
-      const yy = e.clientY - r.top
+
+      const { x: xx, y: yy } = canvasXY(e.clientX, e.clientY)
       const dx = xx - start.x
       const dy = yy - start.y
       
@@ -503,12 +493,12 @@ const Analyzer = memo(function Analyzer() {
     
     function up() {
       isDrawingRef.current = false
-      window.removeEventListener('mousemove', move)
-      window.removeEventListener('mouseup', up)
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
     }
-    
-    window.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', up)
+
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
   }
 
   function startScalePick() {
@@ -517,8 +507,7 @@ const Analyzer = memo(function Analyzer() {
 
   function onCanvasClick(ev) {
     if (!pickPts) return
-    const r = canvasRef.current.getBoundingClientRect()
-    const pt = { x: ev.clientX - r.left, y: ev.clientY - r.top }
+    const pt = canvasXY(ev.clientX, ev.clientY)
     setPickPts((p) => {
       const np = [...p, pt]
       if (np.length === 2) {
@@ -608,8 +597,8 @@ const Analyzer = memo(function Analyzer() {
         </button>
         
         {ellipse && (
-          <button className="btn" onClick={analyze}>
-            {isVideo ? '🎬 Analyze Video' : '🔍 Analyze Photo'}
+          <button className="btn primary" onClick={analyze}>
+            {isVideo ? '🎬 Analyze video' : '🔍 Analyze photo'}
           </button>
         )}
         
@@ -647,95 +636,22 @@ const Analyzer = memo(function Analyzer() {
           >
             🗑️ Clear
           </button>
-          <button 
-            className="btn small" 
+          <button
+            className="btn small"
             onClick={startComplexShapeFitting}
             disabled={!img}
-            title="Fit complex non-elliptical shapes"
+            title="Trace a non-elliptical bubble point by point"
           >
-            🎯 Complex Shape
+            🎯 Complex shape
           </button>
         </div>
       </div>
       
-      {/* Core Question Answer Box */}
-      <div className="card" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-        <h3 style={{ color: 'white', margin: '0 0 16px 0' }}>🎯 Core Question: Can Bubble Shape Predict Wind & Wand Motion?</h3>
-        <div style={{ fontSize: '16px', lineHeight: '1.6' }}>
-          <p><strong>General Answer: YES, with sophisticated physics modeling!</strong></p>
-          <p>
-            Using empirical surrogate laws (Loth 2008), we can extract:
-          </p>
-          <ul style={{ margin: '12px 0', paddingLeft: '20px' }}>
-            <li><strong>Wind Speed:</strong> From bubble elongation (Weber number)</li>
-            <li><strong>Wind Direction:</strong> From major axis orientation</li>
-            <li><strong>Wand Motion:</strong> From video analysis (least-squares fitting)</li>
-            <li><strong>Confidence:</strong> Quantified uncertainty assessment</li>
-          </ul>
-          <p style={{ margin: '16px 0 0 0', fontStyle: 'italic' }}>
-            "The key insight is the empirical surrogate law D ≈ k₁We/(1 + k₂We) 
-            that links observable bubble deformation to underlying flow physics."
-          </p>
-        </div>
-      </div>
-      
-      {/* 3D Bubble Complexity Note */}
-      <div className="card" style={{ background: 'rgba(255, 193, 7, 0.1)', border: '1px solid rgba(255, 193, 7, 0.3)' }}>
-        <h4 style={{ color: '#f57c00', margin: '0 0 12px 0' }}>⚠️ Important: 3D Bubble Complexity</h4>
-        <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
-          <p><strong>Current Limitation:</strong> This analysis uses 2D ellipse fitting, but real bubbles are complex 3D objects.</p>
-          <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
-            <li><strong>3D Shape:</strong> Bubbles have depth, curvature, and complex surface geometry</li>
-            <li><strong>Perspective Effects:</strong> 2D photos show perspective projections, not true cross-sections</li>
-            <li><strong>Shape Complexity:</strong> Wind causes 3D deformations beyond simple elongation</li>
-            <li><strong>Surface Tension:</strong> Creates complex curvature patterns not captured by ellipses</li>
-          </ul>
-          <p style={{ margin: '12px 0 0 0', fontStyle: 'italic' }}>
-            <strong>Future Enhancement:</strong> Multi-view analysis, 3D reconstruction, or machine learning could provide more accurate shape modeling.
-          </p>
-        </div>
-      </div>
-      
-      {/* Specific Results for This Bubble */}
-      {report && (
-        <div className="card" style={{ background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)', color: 'white' }}>
-          <h3 style={{ color: 'white', margin: '0 0 16px 0' }}>🔍 For THIS Bubble: What We Found</h3>
-          <div style={{ fontSize: '16px', lineHeight: '1.6' }}>
-            {report.type === 'photo' ? (
-              <>
-                <p><strong>Single Photo Analysis Results:</strong></p>
-                <ul style={{ margin: '12px 0', paddingLeft: '20px' }}>
-                  <li><strong>Wind Speed:</strong> {report.relativeVelocity.toFixed(2)} m/s (from Weber number {report.weberNumber.toFixed(2)})</li>
-                  <li><strong>Wind Direction:</strong> {report.windDirection.toFixed(1)}° (from major axis orientation)</li>
-                  <li><strong>Wind Description:</strong> {report.interpretation.description}</li>
-                  <li><strong>Analysis Confidence:</strong> {report.confidence.toUpperCase()}</li>
-                </ul>
-                <p style={{ margin: '16px 0 0 0', fontStyle: 'italic' }}>
-                  "This bubble's elongation indicates {report.interpretation.speedClass} wind from {report.interpretation.directionClass} direction."
-                </p>
-              </>
-            ) : (
-              <>
-                <p><strong>Video Analysis Results:</strong></p>
-                <ul style={{ margin: '12px 0', paddingLeft: '20px' }}>
-                  <li><strong>Wind Speed:</strong> {report.summary.wind.speed.toFixed(2)} m/s (from {report.frames} frames)</li>
-                  <li><strong>Wind Direction:</strong> {(report.summary.wind.direction * 180 / Math.PI).toFixed(1)}° (from major axis evolution)</li>
-                  <li><strong>Wand Release Speed:</strong> {report.summary.wand.speed.toFixed(2)} m/s (separated from ambient wind)</li>
-                  <li><strong>Wand Release Direction:</strong> {(report.summary.wand.direction * 180 / Math.PI).toFixed(1)}° (launch trajectory)</li>
-                  <li><strong>Analysis Confidence:</strong> {(report.confidence * 100).toFixed(0)}%</li>
-                </ul>
-                <p style={{ margin: '16px 0 0 0', fontStyle: 'italic' }}>
-                  "This video sequence reveals both the ambient wind conditions and how the wands were moved during bubble launch."
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-      
       {!img && (
         <div className="notice small">
-          Upload an image or video then drag on the canvas to outline the bubble.
+          Upload a photo or video, then drag on the canvas to fit an ellipse to the bubble. Set a
+          scale to get results in real units. Heads-up: this fits a 2D ellipse, so perspective and a
+          bubble's true 3D shape add uncertainty — treat the numbers as estimates.
         </div>
       )}
       
@@ -758,10 +674,10 @@ const Analyzer = memo(function Analyzer() {
       {/* Scale Setting */}
       {ellipse && (
         <div className="card">
-          <h4>📏 Set Scale</h4>
+          <h4>📏 Set scale</h4>
           <div className="stack">
             <div className="row">
-              <label>Scale: </label>
+              <label>Scale </label>
               <input 
                 type="number" 
                 value={scalePxPerCm} 
@@ -773,12 +689,12 @@ const Analyzer = memo(function Analyzer() {
               <span>px/cm</span>
             </div>
             
-            {/* Auto-Scale Estimation */}
-            <div className="card" style={{ background: 'rgba(108,123,255,0.05)', border: '1px solid rgba(108,123,255,0.2)' }}>
-              <h5 style={{ margin: '0 0 12px 0', color: '#4a90e2' }}>🔍 Auto-Scale Estimation</h5>
+            {/* Auto-scale estimation */}
+            <div className="card">
+              <h5>🔍 Estimate scale from a known object</h5>
               <div className="stack">
                 <div className="row">
-                  <label>Known Object: </label>
+                  <label>Known object </label>
                   <select 
                     value={knownObjectType} 
                     onChange={(e) => {
@@ -796,7 +712,7 @@ const Analyzer = memo(function Analyzer() {
                 </div>
                 
                 <div className="row">
-                  <label>Object Size: </label>
+                  <label>Object size </label>
                   <input 
                     type="number" 
                     value={knownObjectSize} 
@@ -808,28 +724,22 @@ const Analyzer = memo(function Analyzer() {
                   <span>{KNOWN_OBJECTS[knownObjectType].unit}</span>
                 </div>
                 
-                <div className="row" style={{ gap: '8px' }}>
-                  <button 
-                    className="btn small" 
+                <div className="row" style={{ gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    className="btn small"
                     onClick={estimateScaleFromObject}
                     disabled={!img}
+                    title="Detect the largest object and use its size to set the scale"
                   >
-                    🔍 Auto-Detect
+                    🔍 Auto-detect
                   </button>
-                  <button 
-                    className="btn small" 
+                  <button
+                    className="btn small"
                     onClick={estimateScaleFromBubble}
                     disabled={!ellipse}
-                    title="Estimate scale from bubble size (good for large bubbles)"
+                    title="Estimate scale from the bubble's own size (good for large bubbles)"
                   >
-                    🫧 From Bubble
-                  </button>
-                  <button 
-                    className="btn small" 
-                    onClick={estimateScaleManually}
-                    disabled={!img}
-                  >
-                    📐 Manual Measure
+                    🫧 From bubble
                   </button>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <input 
@@ -842,17 +752,15 @@ const Analyzer = memo(function Analyzer() {
                 </div>
                 
                 {scaleEstimate && (
-                  <div className="notice" style={{ background: 'rgba(32, 201, 151, 0.1)', borderColor: 'rgba(32, 201, 151, 0.3)' }}>
-                    <strong>Estimated Scale:</strong> {scaleEstimate.toFixed(2)} px/cm
-                    {autoScaleEnabled && (
-                      <span style={{ color: '#20c997' }}> ✓ Applied automatically</span>
-                    )}
+                  <div className="notice small">
+                    <strong>Estimated scale:</strong> {scaleEstimate.toFixed(2)} px/cm
+                    {autoScaleEnabled && <span className="ok"> ✓ applied automatically</span>}
                   </div>
                 )}
-                
-                <div className="small" style={{ color: '#666', fontStyle: 'italic' }}>
-                  <strong>Tip:</strong> {KNOWN_OBJECTS[knownObjectType].description}. 
-                  Place the object in the image for better auto-detection.
+
+                <div className="small" style={{ color: 'var(--ink2)' }}>
+                  Tip: {KNOWN_OBJECTS[knownObjectType].description.toLowerCase()}. Keep the object in
+                  frame for better auto-detection.
                 </div>
               </div>
             </div>
@@ -864,8 +772,9 @@ const Analyzer = memo(function Analyzer() {
         ref={canvasRef}
         width={720}
         height={440}
-        onMouseDown={onCanvasDown}
+        onPointerDown={onCanvasDown}
         onClick={onCanvasClick}
+        style={{ touchAction: 'none', cursor: pickPts ? 'crosshair' : 'default' }}
       />
       
       {report && (
@@ -873,7 +782,7 @@ const Analyzer = memo(function Analyzer() {
           {report.type === 'photo' ? (
             // Single photo analysis results
             <>
-              <div className="label">Analysis Type</div>
+              <div className="label">Analysis type</div>
               <div>Single Photo</div>
               <div className="label">Confidence</div>
               <div className={`badge ${report.confidence}`}>
@@ -911,7 +820,7 @@ const Analyzer = memo(function Analyzer() {
           ) : (
             // Video analysis results
             <>
-              <div className="label">Analysis Type</div>
+              <div className="label">Analysis type</div>
               <div>Video Sequence</div>
               <div className="label">Frames analyzed</div>
               <div>{report.frames}</div>
