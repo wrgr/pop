@@ -273,3 +273,38 @@ test('without a thickness there is no drainage (unchanged behaviour)', () => {
   settle(b, 3, { windX: 0, windY: 0, gravity: 10, drainage: 500, evaporation: 500 })
   assert.equal(b.popped, false, 'no thickness ⇒ drainage does nothing')
 })
+
+// --- Convective evaporation: wind shortens the film's life ---
+
+function lifetimeInWind({ thickness = 1000, evaporation = 18, windX = 0, windThinning = 0 }, cap = 120) {
+  const b = createBubble({ R: 70, n: 56, thickness })
+  const dt = 1 / 60
+  for (let t = 0; t < cap; t += dt) {
+    step(b, dt, { windX, windY: 0, gravity: 10, drainage: 220, evaporation, windThinning })
+    if (b.popped) return { t, reason: b.popReason }
+  }
+  return { t: Infinity, reason: null }
+}
+
+test('a bubble that lags the wind drains faster than one in still air', () => {
+  const still = lifetimeInWind({ windX: 0, windThinning: 0.14 })
+  const windy = lifetimeInWind({ windX: 170, windThinning: 0.14 })
+  assert.ok(windy.t < still.t, `wind should shorten life: still=${still.t} windy=${windy.t}`)
+  assert.equal(windy.reason, 'drained')
+})
+
+test('windThinning is what adds the wind penalty (same wind, convection off ⇒ longer)', () => {
+  // Isolate convection from wind-driven deformation: identical wind, only the
+  // convective term differs.
+  const off = lifetimeInWind({ windX: 170, windThinning: 0 })
+  const on = lifetimeInWind({ windX: 170, windThinning: 0.14 })
+  assert.ok(on.t < off.t, `convective evaporation should add a wind penalty: off=${off.t} on=${on.t}`)
+})
+
+test('with nothing to evaporate (humid air), wind adds no convective loss', () => {
+  // evaporation 0 ⇒ the convective term is inert; only drainage thins the wall,
+  // so windThinning must not change the life at all.
+  const off = lifetimeInWind({ evaporation: 0, windX: 170, windThinning: 0 })
+  const on = lifetimeInWind({ evaporation: 0, windX: 170, windThinning: 0.14 })
+  assert.equal(on.t, off.t, 'no evaporation ⇒ wind cannot speed thinning')
+})

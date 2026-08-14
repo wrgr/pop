@@ -76,7 +76,7 @@ const ReferencesModal = memo(function ReferencesModal({ onClose }) {
                   <li>POP is a teaching tool with literature-inspired heuristics — treat numbers as estimates, and calibrate for your own setup.</li>
                   <li>The Analyzer fits a 2D ellipse, so perspective and a bubble's true 3D shape add uncertainty.</li>
                   <li>A single photo can't separate wand launch from wind — use video (or the recorder) for that.</li>
-                  <li>POP now drains and evaporates the film to a timed lifetime, but wind's effect on that life is still weak — see the Coach's "what POP doesn't model" for the remaining open questions.</li>
+                  <li>POP drains and evaporates the film to a timed lifetime — and a crosswind sweeps the humid layer off it to shorten that life — but film weight/buoyancy and surfactant elasticity aren't modeled yet; see the Coach's "what POP doesn't model" for the open questions.</li>
                 </ul>
               </div>
             </div>
