@@ -5,6 +5,7 @@ import { analyzeSeries } from '../lib/forensics.js'
 import { computeMouthStats, calculateLoopArea } from '../lib/physics.js'
 import WandEditor from './WandEditor.jsx'
 import Drawer from './Drawer.jsx'
+import Bubble3D from './Bubble3D.jsx'
 
 // Derive a bubble's birth geometry from a hand-drawn wand loop: its area sets
 // the size, its aspect sets the elongation, its tilt sets the orientation — so
@@ -76,9 +77,13 @@ const BubblePhysics = memo(function BubblePhysics() {
   const [showField, setShowField] = useState(true)
   const [readout, setReadout] = useState(null)
   const [report, setReport] = useState(null)
+  const [view, setView] = useState('2d') // '2d' canvas | '3d' three.js
   const [wand, setWand] = useState([]) // custom wand/loop control points (WandEditor)
   const wandRef = useRef(wand)
   useEffect(() => { wandRef.current = wand }, [wand])
+  // Latest measured shape, published every physics frame for the 3D view to read.
+  const latestRef = useRef(null)
+  const getFrame = useCallback(() => latestRef.current, [])
 
   const canvasRef = useRef(null)
   const stateRef = useRef(null)
@@ -378,8 +383,12 @@ const BubblePhysics = memo(function BubblePhysics() {
           spin: p.spin,
         })
 
+        // Publish the current shape for the 3D view (and reuse for recycling).
+        const mNow = measure(state)
+        latestRef.current = { a: mNow.a, b: mNow.b, angle: mNow.angle, R0: state.R0, popped: state.popped }
+
         // Recycle the bubble once it drifts off-screen or bursts.
-        const c = state.nodes.length ? measure(state).centroid : { x: 0, y: 0 }
+        const c = mNow.centroid
         if (state.popped || c.x > W + 80 || c.x < -80 || c.y > H + 80 || c.y < -120) {
           // brief pause on a pop so the label is visible
           if (state.popped) {
@@ -445,7 +454,9 @@ const BubblePhysics = memo(function BubblePhysics() {
       </div>
 
       <div className="sim-wrap">
-        <canvas ref={canvasRef} width={W} height={H}></canvas>
+        {view === '3d'
+          ? <Bubble3D getFrame={getFrame} width={W} height={H} />
+          : <canvas ref={canvasRef} width={W} height={H}></canvas>}
       </div>
 
       <div className="controls" style={{ gap: 14 }}>
@@ -453,10 +464,16 @@ const BubblePhysics = memo(function BubblePhysics() {
         <button className="btn" onClick={() => setRunning((r) => !r)}>
           {running ? '⏸ Pause' : '▶ Play'}
         </button>
-        <label className="pill" title="Show wind tracers">
-          <input type="checkbox" checked={showField} onChange={(e) => setShowField(e.target.checked)} />
-          🌬️ wind field
-        </label>
+        <div className="pill" style={{ gap: 6 }} title="Render the same physics in 2D or 3D">
+          <button className={`btn small ${view === '2d' ? 'primary' : 'ghost'}`} onClick={() => setView('2d')}>2D</button>
+          <button className={`btn small ${view === '3d' ? 'primary' : 'ghost'}`} onClick={() => setView('3d')}>🧊 3D</button>
+        </div>
+        {view === '2d' && (
+          <label className="pill" title="Show wind tracers">
+            <input type="checkbox" checked={showField} onChange={(e) => setShowField(e.target.checked)} />
+            🌬️ wind field
+          </label>
+        )}
         <button className="btn" onClick={recordAndAnalyze} title="Fly a bubble, then infer the settings back from its shape series">
           🎥 Record &amp; analyze
         </button>
@@ -640,26 +657,26 @@ const BubblePhysics = memo(function BubblePhysics() {
         </div>
       )}
 
-      <div className="footer small" style={{ padding: 0, border: 'none' }}>
-        The <strong>applied → recovered</strong> row is POP's thesis in miniature: the wind that
-        shaped the bubble is read straight back out of the shape the physics produced (they track
-        with a lag set by the relaxation time τ). And because a drifting bubble only feels the{' '}
-        <em>relative</em> wind, one snapshot can't separate wind from the bubble's own motion — which
-        is exactly why POP's analyzer turns to <strong>video</strong>. Crank the wind up and watch
-        the film over-deform and pop.
-      </div>
-
-      <div className="notice small" style={{ margin: 0 }}>
-        <strong>Every knob here can masquerade as wind:</strong> <strong>gravity (Bond number)</strong>{' '}
-        stretches a big bubble vertically with <em>no wind at all</em>; <strong>film thickness</strong>{' '}
-        sets the inertia, so a freshly pinched bubble <em>rings</em> and a frame can catch it
-        mid-wobble; the <strong>launcher</strong> — POP's other half — stamps the bubble with the
-        loop's own elongation (a rigid wand hands off a clean round start); a <strong>wake</strong>{' '}
-        draws a downwind tail; and <strong>spin</strong> tumbles the whole shape so its tilt rotates.
-        Wind, sag, ringing, launcher, wake, and spin are all degenerate in one silhouette — which is
-        why, to pull them apart, you have to go the other way: read a <em>series</em> of shapes over
-        time. That's what the recorder below does.
-      </div>
+      <Drawer title="💡 What the readout means, and why every knob looks like wind">
+        <div className="stack small" style={{ gap: 12 }}>
+          <p style={{ margin: 0 }}>
+            The <strong>applied → recovered</strong> row is POP's thesis in miniature: the wind that
+            shaped the bubble is read straight back out of the shape the physics produced (they track
+            with a lag set by the relaxation time τ). Because a drifting bubble only feels the{' '}
+            <em>relative</em> wind, one snapshot can't separate wind from the bubble's own motion —
+            which is exactly why POP's analyzer turns to <strong>video</strong>.
+          </p>
+          <p style={{ margin: 0 }}>
+            <strong>Every knob here can masquerade as wind:</strong> <strong>gravity (Bond number)</strong>{' '}
+            stretches a big bubble vertically with no wind at all; <strong>film thickness</strong> sets the
+            inertia, so a freshly pinched bubble <em>rings</em>; the <strong>launcher</strong> stamps the
+            bubble with the loop's own elongation; a <strong>wake</strong> draws a downwind tail; and{' '}
+            <strong>spin</strong> tumbles the whole shape. All are degenerate in one silhouette — to pull
+            them apart you go the other way and read a <em>series</em> over time, which is what the
+            recorder below does.
+          </p>
+        </div>
+      </Drawer>
 
       <div className="card" style={{ margin: 0 }}>
         <h4 style={{ marginTop: 0 }}>🔎 Inverse: infer the environment from a series of shapes</h4>
