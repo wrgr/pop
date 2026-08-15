@@ -35,10 +35,10 @@ const ReferencesModal = memo(function ReferencesModal({ onClose }) {
             </div>
 
             <div className="card">
-              <h3>🎯 Coach — make it "better"</h3>
+              <h3>🎯 Coach — harder, better, faster, stronger</h3>
               <div className="stack small">
                 <p style={{ margin: 0 }}>
-                  In the analysis, pick a goal — <strong>bigger, longer-lasting, faster, or sturdier</strong> —
+                  In the analysis, pick a goal — <strong>harder, better, faster, or stronger</strong> (the song: resists popping, bigger, quicker, longer flight) —
                   and POP ranks concrete levers (loop size, surface tension, film, wind) with the physics
                   behind each, plus the effects it doesn't model yet.
                 </p>
