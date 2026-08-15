@@ -213,12 +213,17 @@ function nodeNormals(nodes, sign) {
  *      elongates the bubble, (b) a leeward `wake` suction (∝ v_rel² · cosθ on
  *      the back) that draws the tail out for a fore-aft-asymmetric bluff-body
  *      shape, and (c) linear drag (∝ v_rel), which advects the bubble downwind.
- *   4. Gravity — a uniform body force so a still bubble drifts down, plus a
- *      *sag* term (`sag`, ∝ the gravitational Bond number): a depth-weighted
- *      pull that stretches a large bubble vertically even in dead-still air, the
- *      same ellipse a vertical wind would produce.
+ *   4. Gravity — a uniform body force so a still bubble drifts down, net of a
+ *      `buoyancy` term (displaced air) so the fall speed grows with the film's
+ *      mass (heavy sinks, light hangs); plus a *sag* term (`sag`, ∝ the
+ *      gravitational Bond number): a depth-weighted pull that stretches a large
+ *      bubble vertically even in dead-still air, the same ellipse a vertical wind
+ *      would produce.
  *   5. Spin — an optional rigid rotation (`spin`, rad/s) of the whole membrane
  *      about its centroid, so any elongation tumbles rather than holding still.
+ *   6. Film elasticity — an optional surfactant (`elasticity`, Marangoni/Gibbs):
+ *      surface-tension gradients heal thin spots, so a conditioned mix tolerates
+ *      more stretch before it bursts and (via slower drainage) lasts longer.
  *
  * @param {object} state  Bubble from createBubble (mutated in place).
  * @param {number} dt     Frame time (s).
@@ -236,8 +241,14 @@ export function step(state, dt, p = {}) {
     wake = 0, // leeward low-pressure (wake) suction — form drag / fore-aft asymmetry
     drag = 0.6, // linear (viscous) drag coefficient
     gravity = 18, // downward acceleration (px/s^2)
+    buoyancy = 0, // upward force from displaced air (per node). Net weight = gravity·mass − buoyancy,
+    //             so a heavier (thicker) film sinks faster and a light one hangs/floats — the fall
+    //             speed finally depends on the film's mass. 0 = pure Galilean gravity (mass-independent).
     sag = 0, // gravitational sag coefficient (∝ Bond number); 0 = weightless film
     spin = 0, // rigid rotation rate (rad/s) about the centroid — a tumbling bubble
+    elasticity = 0, // surfactant (Marangoni/Gibbs) film elasticity, 0 (watery) … 1 (conditioned/glycerin).
+    //               Surface-tension gradients heal thin spots, so a conditioned film tolerates more
+    //               stretch before rupturing (sturdier) and drains slower (longer-lived) — see below.
     damping = 0.9, // per-second velocity retention (air resistance/relaxation)
     mass = 1,
     substeps = 4,
@@ -358,8 +369,12 @@ export function step(state, dt, p = {}) {
         }
       }
 
-      // (4) Gravity.
-      fy[i] += gravity * mass
+      // (4) Gravity, net of buoyancy. A soap bubble is nearly neutrally buoyant:
+      // the displaced air (buoyancy) very nearly cancels its weight, and what's
+      // left is the film's own mass. So the net downward pull grows with a
+      // heavier/thicker film — heavy sinks, light hangs — instead of every bubble
+      // falling at the same rate.
+      fy[i] += gravity * mass - buoyancy
     }
 
     // Remove the net force contributed by gravity-sag so it produces shape,
@@ -408,9 +423,12 @@ export function step(state, dt, p = {}) {
   state.age += dt
 
   // Pop if the film is stretched past a plausible failure strain — a real
-  // bubble bursts when the wind over-deforms it. Callers can watch state.popped.
+  // bubble bursts when the wind over-deforms it. A conditioned, elastic film
+  // heals thin spots and so tolerates a larger strain before it goes, which is
+  // the visible half of why a good mix is sturdier. Callers watch state.popped.
   const m = measure(state)
-  if (m.D > 0.62) { state.popped = true; state.popReason = 'deformed' }
+  const popD = 0.62 + 0.35 * elasticity
+  if (m.D > popD) { state.popped = true; state.popReason = 'deformed' }
 
   // Film lifetime: the wall thins as liquid drains (gravity, ∝ thickness²) and
   // evaporates, and it ruptures once it reaches the black-film limit. Deformation
@@ -437,7 +455,12 @@ export function step(state, dt, p = {}) {
       const slip = Math.abs(((windX - d.vx) * windX + (windY - d.vy) * windY) / wmag)
       conv = 1 + windThinning * Math.sqrt(slip)
     }
-    const rate = (drainage * hRel * hRel + evaporation * conv) * (1 + 0.5 * m.D)
+    // A conditioned (elastic) film also drains and evaporates more slowly — the
+    // surfactant stiffens the interface and holds water, which is the other half
+    // of why a good mix lasts longer.
+    const drainSlow = 1 - 0.6 * elasticity
+    const evapSlow = 1 - 0.3 * elasticity
+    const rate = (drainage * drainSlow * hRel * hRel + evaporation * evapSlow * conv) * (1 + 0.5 * m.D)
     state.thickness -= rate * dt
     if (!state.popped && state.thickness <= critThickness) {
       state.popped = true

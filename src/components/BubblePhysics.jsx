@@ -74,6 +74,7 @@ const BubblePhysics = memo(function BubblePhysics() {
     wake: 0, // leeward wake suction — fore-aft asymmetry (bluff-body tail)
     spin: 0, // rigid rotation rate (rad/s) — a tumbling bubble
     humidity: 0.5, // 0 = dry (fast evaporation) … 1 = humid (slow) — sets film lifetime
+    mix: 0.4, // 0 = watery … 1 = conditioned/glycerin — surfactant elasticity (sturdier + longer)
   })
   const [running, setRunning] = useState(true)
   const [showField, setShowField] = useState(true)
@@ -119,6 +120,10 @@ const BubblePhysics = memo(function BubblePhysics() {
   const evaporationFromHumidity = (h) => 34 - 26 * h
   const DRAINAGE = 220 // gravity-drainage speed of the wall at 1 µm (nm/s)
   const WIND_THINNING = 0.14 // convective-evaporation gain: airflow across the film speeds evaporation ∝ √(slip)
+  const LIVE_GRAVITY = 10 // downward acceleration used everywhere the bubble flies (px/s²)
+  // Buoyancy of the displaced air: set so the thinnest film is ~neutral (hangs)
+  // and heavier films sink — that's what makes "floaty vs. heavy" readable.
+  const BUOYANCY = LIVE_GRAVITY * massFromFilm(0.5) // neutral at the lightest film
 
   // Resolve the newborn bubble's {R, squash, tilt} from the chosen launcher.
   // 'custom' reads the hand-drawn loop; the others use the analytic model.
@@ -178,8 +183,8 @@ const BubblePhysics = memo(function BubblePhysics() {
       step(b, dt, {
         windX: wx, windY: wy,
         kSpring: p.kSpring, kPressure: p.kPressure,
-        gravity: 10, sag: sagFromBond(p.bond, p.R), mass: massFromFilm(p.film),
-        wake: p.wake, spin: p.spin,
+        gravity: LIVE_GRAVITY, buoyancy: BUOYANCY, sag: sagFromBond(p.bond, p.R), mass: massFromFilm(p.film),
+        elasticity: p.mix, wake: p.wake, spin: p.spin,
       })
       const m = measure(b)
       frames.push({ t, D: m.D, chi: m.chi, angle: m.angle, area: m.area, cx: m.centroid.x, cy: m.centroid.y })
@@ -190,11 +195,11 @@ const BubblePhysics = memo(function BubblePhysics() {
     // Characterise the recorded bubble for the coach: an approximate display
     // diameter (px→cm), the wind it flew in, its launcher, and a measured film
     // ring signature.
-    const cfg = { R: p.R, kSpring: p.kSpring, kPressure: p.kPressure, mass: massFromFilm(p.film) }
+    const cfg = { R: p.R, kSpring: p.kSpring, kPressure: p.kPressure, mass: massFromFilm(p.film), elasticity: p.mix }
     const ring = ringSignature(cfg)
     // Time the film draining — both the still-air baseline and the life it
     // actually gets in the wind it flew in (convective evaporation shortens it).
-    const lifeOpts = { thickness: thicknessFromFilm(p.film), drainage: DRAINAGE, evaporation: evaporationFromHumidity(p.humidity) }
+    const lifeOpts = { thickness: thicknessFromFilm(p.film), drainage: DRAINAGE, evaporation: evaporationFromHumidity(p.humidity), elasticity: p.mix }
     const lifetimeS = bubbleLifetime(cfg, lifeOpts)
     const lifetimeWindS = bubbleLifetime(cfg, { ...lifeOpts, windMs: p.windSpeed, windThinning: WIND_THINNING })
     const obs = {
@@ -207,6 +212,7 @@ const BubblePhysics = memo(function BubblePhysics() {
       ring,
       lifetimeS,
       lifetimeWindS,
+      mix: p.mix,
     }
 
     setReport({
@@ -411,9 +417,11 @@ const BubblePhysics = memo(function BubblePhysics() {
           windY: wy,
           kSpring: p.kSpring,
           kPressure: p.kPressure,
-          gravity: 10, // soap bubbles are nearly neutrally buoyant — they float down slowly
+          gravity: LIVE_GRAVITY, // soap bubbles are nearly neutrally buoyant — they float down slowly
+          buoyancy: BUOYANCY, // net of displaced air: heavy films sink, thin ones hang
           sag: sagFromBond(p.bond, p.R),
           mass: massFromFilm(p.film),
+          elasticity: p.mix, // conditioned mix = sturdier + longer-lived
           wake: p.wake,
           spin: p.spin,
           drainage: DRAINAGE,
@@ -462,6 +470,7 @@ const BubblePhysics = memo(function BubblePhysics() {
             relTrue,
             relInfer,
             driftMs: Math.hypot(drift.vx, drift.vy) / PX_PER_MS,
+            vy: drift.vy, // vertical drift (px/s): + sinks, − rises
             bond: p.bond,
             film: p.film,
             launcher: p.launcher,
@@ -592,7 +601,7 @@ const BubblePhysics = memo(function BubblePhysics() {
         </label>
       </div>
 
-      <Drawer title="⚙️ More parameters (size, gravity, film, humidity, wake, spin)">
+      <Drawer title="⚙️ More parameters (size, gravity, film, humidity, mix, wake, spin)">
       <div className="controls" style={{ gap: 16 }}>
         <label className="pill" title="Bubble radius (px)">
           ⚪ Size
@@ -627,8 +636,13 @@ const BubblePhysics = memo(function BubblePhysics() {
           <input type="range" min="0" max="1" step="0.05" value={params.humidity}
             onChange={(e) => set('humidity', parseFloat(e.target.value))} /> {(params.humidity * 100).toFixed(0)}%
         </label>
+        <label className="pill" title="Soap mix — a conditioned (glycerin) mix heals thin spots: sturdier and longer-lived">
+          🧼 Mix
+          <input type="range" min="0" max="1" step="0.05" value={params.mix}
+            onChange={(e) => set('mix', parseFloat(e.target.value))} /> {params.mix < 0.33 ? 'watery' : params.mix < 0.66 ? 'soapy' : 'conditioned'}
+        </label>
         <span className="small" style={{ alignSelf: 'center', color: 'var(--ink2)' }}>
-          A thicker film in humid air lasts far longer before the wall drains out and pops.
+          A thicker film in humid air lasts far longer; a conditioned mix survives more and lasts longer still. Thin films hang in the air, heavy ones sink.
         </span>
       </div>
 
@@ -710,6 +724,16 @@ const BubblePhysics = memo(function BubblePhysics() {
               </div>
             </>
           )}
+          <div className="label">Float vs. sink (film weight)</div>
+          <div>
+            {readout.vy > 6
+              ? `sinking (${(readout.vy / PX_PER_MS).toFixed(2)} m/s) — a heavier film out-weighs its buoyancy`
+              : readout.vy > 1.5
+                ? 'settling slowly — the film just out-weighs the air it displaces'
+                : readout.vy > -1.5
+                  ? 'hanging — nearly neutrally buoyant, so the wind carries it'
+                  : 'drifting up — this film is lighter than the air it displaces'}
+          </div>
         </div>
       )}
 
