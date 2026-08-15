@@ -812,21 +812,22 @@ const BubblePhysics = memo(function BubblePhysics() {
 
             {plan && (
               <div className="card" style={{ margin: 0 }}>
-                <h4 style={{ marginTop: 0 }}>🎯 Coach — how to do "better"</h4>
-                <p className="small" style={{ marginTop: 0 }}>Pick what "better" means, and POP reads this bubble and ranks the levers.</p>
+                <h4 style={{ marginTop: 0 }}>🎯 Coach — harder, better, faster, stronger</h4>
+                <p className="small" style={{ marginTop: 0 }}>Pick a goal and POP reads this bubble, then ranks the levers to get there.</p>
                 <div className="controls" style={{ gap: 8, borderTop: 'none', padding: 0, marginBottom: 12 }}>
                   {GOALS.map((g) => (
                     <button
                       key={g.key}
                       className={`btn small ${goal === g.key ? 'primary' : 'ghost'}`}
                       onClick={() => setGoal(g.key)}
+                      title={g.hint ? `${g.label} — ${g.hint}` : g.label}
                     >
                       {g.icon} {g.label}
                     </button>
                   ))}
                 </div>
                 <div className="kv small" style={{ marginBottom: 12 }}>
-                  <div className="label">{plan.goal.icon} {plan.goal.label} — where it stands</div>
+                  <div className="label">{plan.goal.icon} {plan.goal.label}{plan.goal.hint ? ` (${plan.goal.hint})` : ''} — where it stands</div>
                   <div>
                     <div style={{ height: 8, borderRadius: 999, background: 'var(--line)', overflow: 'hidden', maxWidth: 240 }}>
                       <div style={{ width: `${plan.score}%`, height: '100%', background: 'var(--accent)' }} />

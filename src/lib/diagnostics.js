@@ -2,9 +2,10 @@
  * Bubble diagnostics & coach.
  *
  * Given an observed bubble (what a video would tell you: size, the wind it's in,
- * its launcher, its film "ring", any spin) and a goal — **bigger, longer-lasting,
- * faster, or harder (sturdier)** — recommend concrete, physics-grounded levers to
- * do better, and score where the bubble sits today.
+ * its launcher, its film "ring", any spin) and a goal — **harder, better, faster,
+ * or stronger** (the song), i.e. resists popping / bigger / travels quicker /
+ * longer flight — recommend concrete, physics-grounded levers to do better, and
+ * score where the bubble sits today.
  *
  * The advice is built on the established dimensionless groups rather than the
  * soft-body engine's tuning, because the engine is deliberately stiff in the
@@ -98,11 +99,15 @@ export function groups({ diameterCm = 12, windMs = 3, sigma = 0.03, rho = 1.2, g
   return { We, Bo, R }
 }
 
+// The four goals, named for the song — "harder, better, faster, stronger".
+// The mapping to bubble physics: Harder = resists popping, Better = bigger,
+// Faster = travels quicker, Stronger = stays up longer (hence the "longer
+// flight" hint, so it doesn't blur into Harder).
 export const GOALS = [
-  { key: 'bigger', label: 'Bigger', icon: '⚪' },
-  { key: 'longer', label: 'Longer-lasting', icon: '⏳' },
+  { key: 'harder', label: 'Harder', icon: '🛡️' },
+  { key: 'bigger', label: 'Better', icon: '⚪' },
   { key: 'faster', label: 'Faster', icon: '💨' },
-  { key: 'harder', label: 'Sturdier', icon: '🛡️' },
+  { key: 'longer', label: 'Stronger', hint: 'longer flight', icon: '⏳' },
 ]
 
 // Effects the live engine does NOT capture yet — the hypotheses to add next.
@@ -171,7 +176,7 @@ export function coachBubble(obs, goalKey) {
     // discriminating across the realistic range (We of a hand-sized bubble in a
     // breeze is naturally tens), rather than saturating at 0.
     score = clamp((100 * 5) / (5 + We))
-    summary = `Sturdiness is a low Weber number: We = ρU²R/σ ≈ ${We.toFixed(2)} (${We < 0.3 ? 'robust' : We < 0.8 ? 'moderate' : 'easily distorted'}).`
+    summary = `Harder — how well it resists popping — is a low Weber number: We = ρU²R/σ ≈ ${We.toFixed(2)} (${We < 0.3 ? 'robust' : We < 0.8 ? 'moderate' : 'easily distorted'}).`
     levers = [
       { title: 'Use a conditioned mix (glycerin / good detergent)', control: 'Mix', why: 'Surfactant elasticity heals thin spots as they form, so the film tolerates far more stretch before it bursts — the sturdiest change you can make to the liquid itself.' },
       { title: 'Make it smaller', control: 'Size', why: 'We falls linearly with radius — a small bubble shrugs off wind that distorts a big one.' },
