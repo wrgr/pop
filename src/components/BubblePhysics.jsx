@@ -58,6 +58,32 @@ function makeTracers(count) {
   return tracers
 }
 
+// One-click scenarios — a curated scene per goal (harder/better/faster/stronger).
+// Each patch sets the sliders (including the advanced ones a Simple-mode user
+// never sees), so pressing one drops you straight into an interesting bubble.
+const PRESETS = [
+  {
+    key: 'giant', icon: '🫧', label: 'Giant-bubble sweet spot', goal: 'bigger',
+    note: 'A gentle, steady breeze billows the string loop open — big and beautiful. Nudge Wind up and watch it burst: that narrow "just enough breeze" is the real giant-bubble trick.',
+    patch: { launcher: 'loop', handleSep: 0.5, R: 96, windSpeed: 1.0, windDir: 0, gust: 0.05, launch: 1.5, film: 1.4, mix: 0.6, humidity: 0.6, bond: 0.9, wake: 0, spin: 0 },
+  },
+  {
+    key: 'longflight', icon: '⏳', label: 'Long flight', goal: 'longer',
+    note: 'Thick, conditioned film in humid, calm air — the longest-lived bubble POP can make. Hit Record & analyze to time how long it lasts.',
+    patch: { launcher: 'loop', handleSep: 0.35, R: 70, windSpeed: 0.5, windDir: 0, gust: 0.05, launch: 1.5, film: 2.4, mix: 1.0, humidity: 0.9, bond: 0.6, wake: 0, spin: 0 },
+  },
+  {
+    key: 'confound', icon: '🔎', label: 'The confound', goal: 'harder',
+    note: 'Still air, a big heavy bubble sagging under gravity — one frame looks exactly like a vertical wind. Press Record & analyze: the time-course tells them apart.',
+    patch: { launcher: 'wand', R: 96, windSpeed: 0, windDir: 0, gust: 0, launch: 1.0, film: 1.2, mix: 0.4, humidity: 0.5, bond: 2.2, wake: 0, spin: 0 },
+  },
+  {
+    key: 'race', icon: '💨', label: 'Downwind race', goal: 'faster',
+    note: 'A small, light bubble launched straight downwind in a strong, steady breeze — maximum speed, minimum sturdiness. The opposite of "The confound".',
+    patch: { launcher: 'wand', R: 46, windSpeed: 6.5, windDir: 0, gust: 0.12, launch: 3.0, film: 0.5, mix: 0.3, humidity: 0.4, bond: 0.4, wake: 1.8, spin: 0 },
+  },
+]
+
 const BubblePhysics = memo(function BubblePhysics() {
   const [params, setParams] = useState({
     windSpeed: 3.2, // m/s (display) — scaled to px/s for the engine
@@ -81,6 +107,8 @@ const BubblePhysics = memo(function BubblePhysics() {
   const [readout, setReadout] = useState(null)
   const [report, setReport] = useState(null)
   const [goal, setGoal] = useState('harder') // coach objective: bigger|longer|faster|harder
+  const [mode, setMode] = useState('simple') // 'simple' = clean starting point | 'expert' = every knob
+  const [presetNote, setPresetNote] = useState(null) // "what to notice" for the last scenario applied
   const [view, setView] = useState('2d') // '2d' canvas | '3d' three.js
   const [wand, setWand] = useState([]) // custom wand/loop control points (WandEditor)
   const wandRef = useRef(wand)
@@ -491,16 +519,36 @@ const BubblePhysics = memo(function BubblePhysics() {
 
   const set = useCallback((k, v) => setParams((prev) => ({ ...prev, [k]: v })), [])
 
+  // Apply a one-click scenario: patch the params, sync the imperative ref so the
+  // very next launch uses the new scene, pick the matching goal, and fly it.
+  const applyPreset = useCallback((p) => {
+    setParams((prev) => {
+      const next = { ...prev, ...p.patch }
+      paramsRef.current = next
+      return next
+    })
+    if (p.goal) setGoal(p.goal)
+    setRunning(true)
+    runningRef.current = true
+    setPresetNote(p.note)
+    launchBubble()
+  }, [launchBubble])
+
   const areaPct = readout ? (readout.area / readout.restArea) * 100 : 100
   const plan = report && report.obs ? coachBubble(report.obs, goal) : null
 
   return (
     <div className="stack">
-      <div className="notice" style={{ margin: 0 }}>
-        A real soft-body simulation: the membrane is <strong>point masses + surface-tension
-        springs + internal air pressure</strong>, deformed by an aerodynamic wind model. Nothing
-        here is a pre-baked ellipse — POP then <strong>measures the emergent shape and infers the
-        wind back</strong> from it, live.
+      <div className="controls" style={{ gap: 10, justifyContent: 'space-between' }}>
+        <div className="small" style={{ color: 'var(--ink2)' }}>
+          {mode === 'simple'
+            ? 'Press a scenario below, or just hit Launch and play with the wind.'
+            : 'A real soft-body sim — point masses + surface-tension springs + air pressure — that measures the emergent shape and infers the wind back, live.'}
+        </div>
+        <div className="pill" style={{ gap: 6 }} title="Simple = a clean starting point. Expert = every knob and readout.">
+          <button className={`btn small ${mode === 'simple' ? 'primary' : 'ghost'}`} onClick={() => setMode('simple')}>Simple</button>
+          <button className={`btn small ${mode === 'expert' ? 'primary' : 'ghost'}`} onClick={() => setMode('expert')}>Expert</button>
+        </div>
       </div>
 
       <div className="sim-wrap">
@@ -509,16 +557,30 @@ const BubblePhysics = memo(function BubblePhysics() {
           : <canvas ref={canvasRef} width={W} height={H}></canvas>}
       </div>
 
+      <div className="controls" style={{ gap: 8 }}>
+        <span className="small" style={{ alignSelf: 'center', color: 'var(--ink2)', fontWeight: 600 }}>✨ Scenarios</span>
+        {PRESETS.map((p) => (
+          <button key={p.key} className="btn small" title={p.note} onClick={() => applyPreset(p)}>
+            {p.icon} {p.label}
+          </button>
+        ))}
+      </div>
+      {presetNote && (
+        <div className="notice" style={{ margin: 0 }}>{presetNote}</div>
+      )}
+
       <div className="controls" style={{ gap: 14 }}>
         <button className="btn primary" onClick={launchBubble}>🫧 Launch bubble</button>
         <button className="btn" onClick={() => setRunning((r) => !r)}>
           {running ? '⏸ Pause' : '▶ Play'}
         </button>
-        <div className="pill" style={{ gap: 6 }} title="Render the same physics in 2D or 3D">
-          <button className={`btn small ${view === '2d' ? 'primary' : 'ghost'}`} onClick={() => setView('2d')}>2D</button>
-          <button className={`btn small ${view === '3d' ? 'primary' : 'ghost'}`} onClick={() => setView('3d')}>🧊 3D</button>
-        </div>
-        {view === '2d' && (
+        {mode === 'expert' && (
+          <div className="pill" style={{ gap: 6 }} title="Render the same physics in 2D or 3D">
+            <button className={`btn small ${view === '2d' ? 'primary' : 'ghost'}`} onClick={() => setView('2d')}>2D</button>
+            <button className={`btn small ${view === '3d' ? 'primary' : 'ghost'}`} onClick={() => setView('3d')}>🧊 3D</button>
+          </div>
+        )}
+        {mode === 'expert' && view === '2d' && (
           <label className="pill" title="Show wind tracers">
             <input type="checkbox" checked={showField} onChange={(e) => setShowField(e.target.checked)} />
             🌬️ wind field
@@ -584,23 +646,28 @@ const BubblePhysics = memo(function BubblePhysics() {
           <input type="range" min="0" max="9" step="0.1" value={params.windSpeed}
             onChange={(e) => set('windSpeed', parseFloat(e.target.value))} /> {params.windSpeed.toFixed(1)} m/s
         </label>
-        <label className="pill" title="Wind direction (deg)">
-          🧭 Dir
-          <input type="range" min="-60" max="60" step="1" value={params.windDir}
-            onChange={(e) => set('windDir', parseFloat(e.target.value))} /> {params.windDir}°
-        </label>
-        <label className="pill" title="Gustiness">
-          💨 Gust
-          <input type="range" min="0" max="0.8" step="0.02" value={params.gust}
-            onChange={(e) => set('gust', parseFloat(e.target.value))} /> {(params.gust * 100).toFixed(0)}%
-        </label>
-        <label className="pill" title="Launch speed off the wand (m/s)">
-          🪄 Launch
-          <input type="range" min="0" max="5" step="0.1" value={params.launch}
-            onChange={(e) => set('launch', parseFloat(e.target.value))} /> {params.launch.toFixed(1)} m/s
-        </label>
+        {mode === 'expert' && (
+          <>
+            <label className="pill" title="Wind direction (deg)">
+              🧭 Dir
+              <input type="range" min="-60" max="60" step="1" value={params.windDir}
+                onChange={(e) => set('windDir', parseFloat(e.target.value))} /> {params.windDir}°
+            </label>
+            <label className="pill" title="Gustiness">
+              💨 Gust
+              <input type="range" min="0" max="0.8" step="0.02" value={params.gust}
+                onChange={(e) => set('gust', parseFloat(e.target.value))} /> {(params.gust * 100).toFixed(0)}%
+            </label>
+            <label className="pill" title="Launch speed off the wand (m/s)">
+              🪄 Launch
+              <input type="range" min="0" max="5" step="0.1" value={params.launch}
+                onChange={(e) => set('launch', parseFloat(e.target.value))} /> {params.launch.toFixed(1)} m/s
+            </label>
+          </>
+        )}
       </div>
 
+      {mode === 'expert' && (
       <Drawer title="⚙️ More parameters (size, gravity, film, humidity, mix, wake, spin)">
       <div className="controls" style={{ gap: 16 }}>
         <label className="pill" title="Bubble radius (px)">
@@ -663,8 +730,9 @@ const BubblePhysics = memo(function BubblePhysics() {
         </span>
       </div>
       </Drawer>
+      )}
 
-      {readout && (
+      {mode === 'expert' && readout && (
         <div className="kv">
           <div className="label">Measured deformation D</div>
           <div>
@@ -737,6 +805,7 @@ const BubblePhysics = memo(function BubblePhysics() {
         </div>
       )}
 
+      {mode === 'expert' && (
       <Drawer title="💡 What the readout means, and why every knob looks like wind">
         <div className="stack small" style={{ gap: 12 }}>
           <p style={{ margin: 0 }}>
@@ -757,6 +826,7 @@ const BubblePhysics = memo(function BubblePhysics() {
           </p>
         </div>
       </Drawer>
+      )}
 
       <div className="card" style={{ margin: 0 }}>
         <h4 style={{ marginTop: 0 }}>🔎 Inverse: infer the environment from a series of shapes</h4>
