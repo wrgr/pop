@@ -308,3 +308,37 @@ test('with nothing to evaporate (humid air), wind adds no convective loss', () =
   const on = lifetimeInWind({ evaporation: 0, windX: 170, windThinning: 0.14 })
   assert.equal(on.t, off.t, 'no evaporation ⇒ wind cannot speed thinning')
 })
+
+// --- Buoyancy: the fall speed finally depends on the film's mass ---
+
+test('without buoyancy the fall speed is mass-independent (Galileo)', () => {
+  const light = createBubble({ R: 70, n: 56 })
+  const heavy = createBubble({ R: 70, n: 56 })
+  settle(light, 1.2, { windX: 0, windY: 0, gravity: 10, mass: 0.8 })
+  settle(heavy, 1.2, { windX: 0, windY: 0, gravity: 10, mass: 1.7 })
+  assert.ok(Math.abs(driftVelocity(light).vy - driftVelocity(heavy).vy) < 1, 'no buoyancy ⇒ same fall speed regardless of mass')
+})
+
+test('with buoyancy a heavier film sinks faster and a light one hangs', () => {
+  const light = createBubble({ R: 70, n: 56 })
+  const heavy = createBubble({ R: 70, n: 56 })
+  settle(light, 1.5, { windX: 0, windY: 0, gravity: 10, buoyancy: 8, mass: 0.8 })
+  settle(heavy, 1.5, { windX: 0, windY: 0, gravity: 10, buoyancy: 8, mass: 1.7 })
+  const vLight = driftVelocity(light).vy
+  const vHeavy = driftVelocity(heavy).vy
+  assert.ok(vHeavy > vLight + 3, `heavy should sink faster: light=${vLight.toFixed(1)} heavy=${vHeavy.toFixed(1)}`)
+  assert.ok(vLight < 2, `a near-neutral light film should barely fall: ${vLight.toFixed(1)}`)
+})
+
+// --- Film elasticity (surfactant / Marangoni self-healing) ---
+
+test('an elastic film tolerates more stretch before rupturing', () => {
+  // Squashed to D ≈ 0.70: past the plain-film limit (0.62) but under a
+  // conditioned film's healed limit — so only the watery one bursts.
+  const watery = createBubble({ R: 70, n: 56, squash: 1.4 })
+  const conditioned = createBubble({ R: 70, n: 56, squash: 1.4 })
+  step(watery, 1 / 120, { windX: 0, windY: 0, gravity: 0, elasticity: 0 })
+  step(conditioned, 1 / 120, { windX: 0, windY: 0, gravity: 0, elasticity: 1 })
+  assert.equal(watery.popped, true, 'a watery film bursts past D≈0.62')
+  assert.equal(conditioned.popped, false, 'a conditioned film heals and holds')
+})

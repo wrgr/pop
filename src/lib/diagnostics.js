@@ -34,7 +34,7 @@ export function ringSignature(cfg) {
   const Ds = []
   const ts = []
   for (let t = 0; t < 2.4; t += dt) {
-    step(b, dt, { windX: 0, windY: 0, gravity: 0, mass: cfg.mass || 1, kSpring: cfg.kSpring || 260, kPressure: cfg.kPressure || 90 })
+    step(b, dt, { windX: 0, windY: 0, gravity: 0, mass: cfg.mass || 1, kSpring: cfg.kSpring || 260, kPressure: cfg.kPressure || 90, elasticity: cfg.elasticity || 0 })
     Ds.push(measure(b).D)
     ts.push(t)
   }
@@ -72,13 +72,13 @@ export function windCoupling(cfg, windMs, { pxPerMs = 26 } = {}) {
  */
 export function bubbleLifetime(
   cfg,
-  { thickness = 1000, drainage = 220, evaporation = 18, windMs = 0, windThinning = 0, cap = 120, pxPerMs = 26 } = {},
+  { thickness = 1000, drainage = 220, evaporation = 18, windMs = 0, windThinning = 0, elasticity = 0, buoyancy = 0, cap = 120, pxPerMs = 26 } = {},
 ) {
   const b = createBubble({ R: cfg.R || 70, n: 56, thickness })
   const dt = 1 / 60
   const wx = windMs * pxPerMs
   for (let t = 0; t < cap; t += dt) {
-    step(b, dt, { windX: wx, windY: 0, gravity: 10, mass: cfg.mass || 1, drainage, evaporation, windThinning })
+    step(b, dt, { windX: wx, windY: 0, gravity: 10, buoyancy, mass: cfg.mass || 1, drainage, evaporation, windThinning, elasticity })
     if (b.popped) return t
   }
   return cap
@@ -106,12 +106,13 @@ export const GOALS = [
 ]
 
 // Effects the live engine does NOT capture yet — the hypotheses to add next.
-// (Film drainage & evaporation are now modelled, so "how long does it last?"
-// is a measured quantity — see bubbleLifetime.)
+// (Drainage, evaporation, convective wind loss, film weight/buoyancy and
+// surfactant elasticity are now all modelled — so these are what's still open.)
 export const MODEL_GAPS = [
-  'Buoyancy vs. film weight: POP\'s fall speed is currently mass-independent, so "floaty vs. heavy" can\'t be read from it — adding real film mass & buoyancy would fix that.',
-  'Surfactant (Marangoni) elasticity: surface-tension gradients stiffen the film dynamically and likely explain why some mixes are far sturdier — and why conditioned mixes drain slower.',
-  'Marginal regeneration & temperature: real drainage is patchy and temperature-dependent; POP uses a smooth, uniform thinning law.',
+  'Enclosed-gas density: POP fills the bubble with ambient air, so it only ever sinks or hangs — a warm breath or a lighter gas would make it rise, which POP can\'t show yet.',
+  'Marginal regeneration & temperature: real drainage is patchy (thin patches race up the film) and temperature-dependent; POP uses a smooth, uniform thinning law.',
+  'Thin-film interference colour: a real film\'s swirling colours read out its thickness directly; POP tracks thickness as a number but doesn\'t render those tell-tale colours.',
+  'Lumped surfactant: POP folds a mix\'s whole chemistry into one "elasticity" knob (heals + drains slower); real Marangoni flows and evaporation-driven gradients are richer than that.',
 ]
 
 /**
@@ -152,7 +153,7 @@ export function coachBubble(obs, goalKey) {
           ? `POP flew it in still air and timed the wall draining: it lasts ≈ ${life.toFixed(0)} s before rupturing. Thickness and dryness are the big levers.`
           : `The film's drainage sets its life — thicker, conditioned films in humid air last far longer.`
     levers = [
-      { title: 'Thicken & condition the film (add glycerin)', control: 'Film (µm)', why: 'The wall drains and evaporates until it ruptures — a thicker, conditioned film starts further from the limit and drains slower. The single biggest lever.' },
+      { title: 'Thicken the film and condition the mix (add glycerin)', control: 'Film & Mix', why: 'A thicker wall starts further from the rupture limit, and a conditioned (elastic) mix drains and evaporates slower — together the single biggest lever.' },
       { title: 'Move to more humid air', control: 'Humidity', why: 'Dry air evaporates the wall faster; humidity slows it and directly extends the timed life.' },
       { title: 'Get it out of the wind — or let it ride with the breeze', control: 'Wind', why: `Wind only drains the film while air is moving across it: a bubble carried along with a steady breeze feels almost none, but a gust it can't keep up with sweeps water off fast${windCost ? ` (worth ≈ ${windCost}% of its life here)` : ''}.` },
       { title: 'Pick a moderate size', control: 'Size', why: 'Very large films drain and sag quickly; a mid size lasts longer while still looking good.' },
@@ -162,7 +163,7 @@ export function coachBubble(obs, goalKey) {
     summary = `A bubble travels at the wind speed minus its slip. It's in ≈ ${o.windMs.toFixed(1)} m/s of wind; smaller, lighter bubbles couple to the flow soonest.`
     levers = [
       { title: 'Launch with the wind, not across it', control: 'Direction', why: 'Going downwind adds the airflow to your launch instead of fighting it.' },
-      { title: 'Make it smaller & lighter', control: 'Size / Film', why: 'Less inertia and drag area → it reaches wind speed in fewer bubble-lengths.' },
+      { title: 'Make it smaller & lighter', control: 'Size / Film', why: 'Less inertia and drag area → it reaches wind speed in fewer bubble-lengths. A thin, light film also hangs in the air to be carried, where a heavy one sinks out of the wind.' },
       { title: 'Use a stronger, steady wind', control: 'Wind', why: `Advection speed tracks the wind — but watch deformation as We climbs (now ${We.toFixed(2)}).` },
     ]
   } else {
@@ -172,6 +173,7 @@ export function coachBubble(obs, goalKey) {
     score = clamp((100 * 5) / (5 + We))
     summary = `Sturdiness is a low Weber number: We = ρU²R/σ ≈ ${We.toFixed(2)} (${We < 0.3 ? 'robust' : We < 0.8 ? 'moderate' : 'easily distorted'}).`
     levers = [
+      { title: 'Use a conditioned mix (glycerin / good detergent)', control: 'Mix', why: 'Surfactant elasticity heals thin spots as they form, so the film tolerates far more stretch before it bursts — the sturdiest change you can make to the liquid itself.' },
       { title: 'Make it smaller', control: 'Size', why: 'We falls linearly with radius — a small bubble shrugs off wind that distorts a big one.' },
       { title: 'Raise surface tension', control: 'σ (Tension)', why: 'σ is the restoring force; more of it directly lowers We and stiffens the film.' },
       { title: 'Thicken the film', control: 'Film', why: `More membrane inertia damps fast gust wobbles (it ${o.ring && o.ring.rings ? `rings at ~${o.ring.hz.toFixed(1)} Hz now` : 'already resists ringing'}).` },

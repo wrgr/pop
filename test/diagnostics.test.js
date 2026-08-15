@@ -57,6 +57,18 @@ test('bubbleLifetime is finite and grows with film thickness', () => {
   assert.ok(thick > thin, `thicker film lasts longer: ${thin} vs ${thick}`)
 })
 
+test('a conditioned (elastic) film lasts longer than a watery one', () => {
+  const watery = bubbleLifetime({ R: 70 }, { thickness: 1000, elasticity: 0 })
+  const conditioned = bubbleLifetime({ R: 70 }, { thickness: 1000, elasticity: 1 })
+  assert.ok(conditioned > watery + 2, `elasticity should extend life: watery=${watery} conditioned=${conditioned}`)
+})
+
+test('the sturdier coach recommends a conditioned mix', () => {
+  const text = coachBubble({ diameterCm: 20, windMs: 4 }, 'harder')
+    .levers.map((l) => l.title + ' ' + l.control + ' ' + l.why).join(' ').toLowerCase()
+  assert.match(text, /mix|conditioned|glycerin|surfactant|elastic/)
+})
+
 test('wind shortens the measured lifetime (convective evaporation)', () => {
   const still = bubbleLifetime({ R: 70 }, { thickness: 1000 })
   const windy = bubbleLifetime({ R: 70 }, { thickness: 1000, windMs: 5, windThinning: 0.14 })

@@ -17,7 +17,7 @@ const ReferencesModal = memo(function ReferencesModal({ onClose }) {
                 <ul>
                   <li>Hit <strong>Launch bubble</strong> and watch a real soft-body soap film deform, drift and pop in the wind.</li>
                   <li>Choose a <strong>launcher</strong>: a compliant <em>string loop</em>, a <em>rigid wand</em>, or a <em>custom loop</em> you draw — the loop's shape becomes the bubble's.</li>
-                  <li>Dial <strong>wind, direction, gust and launch</strong> up top; open <strong>More parameters</strong> for gravity (Bond number), film thickness, wake and spin.</li>
+                  <li>Dial <strong>wind, direction, gust and launch</strong> up top; open <strong>More parameters</strong> for gravity, film thickness, humidity, soap mix, wake and spin.</li>
                   <li>Toggle <strong>2D / 3D</strong> to see the same physics as a shaded, refracting 3D bubble.</li>
                 </ul>
               </div>
@@ -76,7 +76,7 @@ const ReferencesModal = memo(function ReferencesModal({ onClose }) {
                   <li>POP is a teaching tool with literature-inspired heuristics — treat numbers as estimates, and calibrate for your own setup.</li>
                   <li>The Analyzer fits a 2D ellipse, so perspective and a bubble's true 3D shape add uncertainty.</li>
                   <li>A single photo can't separate wand launch from wind — use video (or the recorder) for that.</li>
-                  <li>POP drains and evaporates the film to a timed lifetime — and a crosswind sweeps the humid layer off it to shorten that life — but film weight/buoyancy and surfactant elasticity aren't modeled yet; see the Coach's "what POP doesn't model" for the open questions.</li>
+                  <li>POP now models the film's whole life — drainage, evaporation, crosswind thinning, its weight (heavy sinks, thin hangs) and a conditioned mix's toughness — but not yet the rising warm-breath bubble or thin-film colours; see the Coach's "what POP doesn't model" for the open questions.</li>
                 </ul>
               </div>
             </div>
