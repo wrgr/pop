@@ -59,8 +59,8 @@ function makeTracers(count) {
 }
 
 // One-click scenarios — a curated scene per goal (harder/better/faster/stronger).
-// Each patch sets the sliders (including the advanced ones a Simple-mode user
-// never sees), so pressing one drops you straight into an interesting bubble.
+// Each patch sets the sliders (including the advanced ones tucked in the trays),
+// so pressing one drops you straight into an interesting bubble.
 const PRESETS = [
   {
     key: 'giant', icon: '🫧', label: 'Giant-bubble sweet spot', goal: 'bigger',
@@ -84,7 +84,7 @@ const PRESETS = [
   },
 ]
 
-const BubblePhysics = memo(function BubblePhysics() {
+const BubblePhysics = memo(function BubblePhysics({ tab = 'play', active = true }) {
   const [params, setParams] = useState({
     windSpeed: 3.2, // m/s (display) — scaled to px/s for the engine
     windDir: 0, // degrees, 0 = blowing right
@@ -107,8 +107,10 @@ const BubblePhysics = memo(function BubblePhysics() {
   const [readout, setReadout] = useState(null)
   const [report, setReport] = useState(null)
   const [goal, setGoal] = useState('harder') // coach objective: bigger|longer|faster|harder
-  const [mode, setMode] = useState('simple') // 'simple' = clean starting point | 'expert' = every knob
   const [presetNote, setPresetNote] = useState(null) // "what to notice" for the last scenario applied
+  // The live canvas only runs on the Play tab; elsewhere we idle the RAF loop.
+  const activeRef = useRef(active)
+  useEffect(() => { activeRef.current = active }, [active])
   const [view, setView] = useState('2d') // '2d' canvas | '3d' three.js
   const [wand, setWand] = useState([]) // custom wand/loop control points (WandEditor)
   const wandRef = useRef(wand)
@@ -430,6 +432,13 @@ const BubblePhysics = memo(function BubblePhysics() {
   // Main loop: physics + inference + draw, decoupled from React state.
   useEffect(() => {
     const loop = (now) => {
+      // Idle when the Play canvas isn't on screen (Coach/Analyze/Learn): keep the
+      // rAF alive so it resumes instantly, but skip all stepping and drawing.
+      if (!activeRef.current) {
+        lastRef.current = now
+        rafRef.current = requestAnimationFrame(loop)
+        return
+      }
       const last = lastRef.current || now
       let dt = (now - last) / 1000
       lastRef.current = now
@@ -537,20 +546,16 @@ const BubblePhysics = memo(function BubblePhysics() {
   const areaPct = readout ? (readout.area / readout.restArea) * 100 : 100
   const plan = report && report.obs ? coachBubble(report.obs, goal) : null
 
+  // Entering Coach with nothing analyzed yet? Fly one automatically so advice
+  // shows straight away for whatever scene is set in Play.
+  useEffect(() => {
+    if (tab === 'coach' && !report) recordAndAnalyze()
+  }, [tab, report, recordAndAnalyze])
+
   return (
     <div className="stack">
-      <div className="controls" style={{ gap: 10, justifyContent: 'space-between' }}>
-        <div className="small" style={{ color: 'var(--ink2)' }}>
-          {mode === 'simple'
-            ? 'Press a scenario below, or just hit Launch and play with the wind.'
-            : 'A real soft-body sim — point masses + surface-tension springs + air pressure — that measures the emergent shape and infers the wind back, live.'}
-        </div>
-        <div className="pill" style={{ gap: 6 }} title="Simple = a clean starting point. Expert = every knob and readout.">
-          <button className={`btn small ${mode === 'simple' ? 'primary' : 'ghost'}`} onClick={() => setMode('simple')}>Simple</button>
-          <button className={`btn small ${mode === 'expert' ? 'primary' : 'ghost'}`} onClick={() => setMode('expert')}>Expert</button>
-        </div>
-      </div>
-
+      {tab === 'play' ? (
+      <>
       <div className="sim-wrap">
         {view === '3d'
           ? <Bubble3D getFrame={getFrame} width={W} height={H} />
@@ -574,23 +579,14 @@ const BubblePhysics = memo(function BubblePhysics() {
         <button className="btn" onClick={() => setRunning((r) => !r)}>
           {running ? '⏸ Pause' : '▶ Play'}
         </button>
-        {mode === 'expert' && (
-          <div className="pill" style={{ gap: 6 }} title="Render the same physics in 2D or 3D">
-            <button className={`btn small ${view === '2d' ? 'primary' : 'ghost'}`} onClick={() => setView('2d')}>2D</button>
-            <button className={`btn small ${view === '3d' ? 'primary' : 'ghost'}`} onClick={() => setView('3d')}>🧊 3D</button>
-          </div>
-        )}
-        {mode === 'expert' && view === '2d' && (
-          <label className="pill" title="Show wind tracers">
-            <input type="checkbox" checked={showField} onChange={(e) => setShowField(e.target.checked)} />
-            🌬️ wind field
-          </label>
-        )}
-        <button className="btn" onClick={recordAndAnalyze} title="Fly a bubble, then infer the settings back from its shape series">
-          🎥 Record &amp; analyze
-        </button>
+        <label className="pill" title="Wind speed (m/s)" style={{ flex: '1 1 200px' }}>
+          🌬️ Wind
+          <input type="range" min="0" max="9" step="0.1" value={params.windSpeed}
+            onChange={(e) => set('windSpeed', parseFloat(e.target.value))} /> {params.windSpeed.toFixed(1)} m/s
+        </label>
       </div>
 
+      <Drawer title="🧰 Fine-tune — launcher, shape, wind detail & view">
       <div className="controls" style={{ gap: 12 }}>
         <div className="pill" style={{ gap: 8 }} title="What the bubble is launched from">
           🧰 Launcher
@@ -641,34 +637,35 @@ const BubblePhysics = memo(function BubblePhysics() {
       )}
 
       <div className="controls" style={{ gap: 16 }}>
-        <label className="pill" title="Wind speed (m/s)">
-          🌬️ Wind
-          <input type="range" min="0" max="9" step="0.1" value={params.windSpeed}
-            onChange={(e) => set('windSpeed', parseFloat(e.target.value))} /> {params.windSpeed.toFixed(1)} m/s
+        <label className="pill" title="Wind direction (deg)">
+          🧭 Dir
+          <input type="range" min="-60" max="60" step="1" value={params.windDir}
+            onChange={(e) => set('windDir', parseFloat(e.target.value))} /> {params.windDir}°
         </label>
-        {mode === 'expert' && (
-          <>
-            <label className="pill" title="Wind direction (deg)">
-              🧭 Dir
-              <input type="range" min="-60" max="60" step="1" value={params.windDir}
-                onChange={(e) => set('windDir', parseFloat(e.target.value))} /> {params.windDir}°
-            </label>
-            <label className="pill" title="Gustiness">
-              💨 Gust
-              <input type="range" min="0" max="0.8" step="0.02" value={params.gust}
-                onChange={(e) => set('gust', parseFloat(e.target.value))} /> {(params.gust * 100).toFixed(0)}%
-            </label>
-            <label className="pill" title="Launch speed off the wand (m/s)">
-              🪄 Launch
-              <input type="range" min="0" max="5" step="0.1" value={params.launch}
-                onChange={(e) => set('launch', parseFloat(e.target.value))} /> {params.launch.toFixed(1)} m/s
-            </label>
-          </>
+        <label className="pill" title="Gustiness">
+          💨 Gust
+          <input type="range" min="0" max="0.8" step="0.02" value={params.gust}
+            onChange={(e) => set('gust', parseFloat(e.target.value))} /> {(params.gust * 100).toFixed(0)}%
+        </label>
+        <label className="pill" title="Launch speed off the wand (m/s)">
+          🪄 Launch
+          <input type="range" min="0" max="5" step="0.1" value={params.launch}
+            onChange={(e) => set('launch', parseFloat(e.target.value))} /> {params.launch.toFixed(1)} m/s
+        </label>
+        <div className="pill" style={{ gap: 6 }} title="Render the same physics in 2D or 3D">
+          <button className={`btn small ${view === '2d' ? 'primary' : 'ghost'}`} onClick={() => setView('2d')}>2D</button>
+          <button className={`btn small ${view === '3d' ? 'primary' : 'ghost'}`} onClick={() => setView('3d')}>🧊 3D</button>
+        </div>
+        {view === '2d' && (
+          <label className="pill" title="Show wind tracers">
+            <input type="checkbox" checked={showField} onChange={(e) => setShowField(e.target.checked)} />
+            🌬️ wind field
+          </label>
         )}
       </div>
+      </Drawer>
 
-      {mode === 'expert' && (
-      <Drawer title="⚙️ More parameters (size, gravity, film, humidity, mix, wake, spin)">
+      <Drawer title="⚙️ Film, gravity, mix & spin">
       <div className="controls" style={{ gap: 16 }}>
         <label className="pill" title="Bubble radius (px)">
           ⚪ Size
@@ -730,9 +727,9 @@ const BubblePhysics = memo(function BubblePhysics() {
         </span>
       </div>
       </Drawer>
-      )}
 
-      {mode === 'expert' && readout && (
+      <Drawer title="📈 Live readout — what the current bubble measures">
+      {readout ? (
         <div className="kv">
           <div className="label">Measured deformation D</div>
           <div>
@@ -803,11 +800,10 @@ const BubblePhysics = memo(function BubblePhysics() {
                   : 'drifting up — this film is lighter than the air it displaces'}
           </div>
         </div>
+      ) : (
+        <p className="small" style={{ color: 'var(--ink2)' }}>Launch a bubble (in Play) to read its live shape here.</p>
       )}
-
-      {mode === 'expert' && (
-      <Drawer title="💡 What the readout means, and why every knob looks like wind">
-        <div className="stack small" style={{ gap: 12 }}>
+        <div className="stack small" style={{ gap: 12, marginTop: 12 }}>
           <p style={{ margin: 0 }}>
             The <strong>applied → recovered</strong> row is POP's thesis in miniature: the wind that
             shaped the bubble is read straight back out of the shape the physics produced (they track
@@ -826,109 +822,114 @@ const BubblePhysics = memo(function BubblePhysics() {
           </p>
         </div>
       </Drawer>
-      )}
-
-      <div className="card" style={{ margin: 0 }}>
-        <h4 style={{ marginTop: 0 }}>🔎 Inverse: infer the environment from a series of shapes</h4>
-        <p className="small" style={{ marginTop: 0 }}>
-          <strong>Record &amp; analyze</strong> flies a bubble with the settings above, captures the
-          shape it would show in each video frame, and reads the scene back out of that time-series —
-          the reverse of everything else here. Each cue is recovered by its own signature in time.
+      </>
+      ) : (
+      <>
+        <p className="small" style={{ marginTop: 0, color: 'var(--ink2)' }}>
+          POP flies a bubble with your current <strong>Play</strong> settings, reads its shape, and ranks
+          concrete levers toward the goal you pick. Change the scene in Play, then re-analyze here.
         </p>
-        {!report && (
+        <div className="controls" style={{ gap: 8 }}>
+          {GOALS.map((g) => (
+            <button
+              key={g.key}
+              className={`btn small ${goal === g.key ? 'primary' : 'ghost'}`}
+              onClick={() => setGoal(g.key)}
+              title={g.hint ? `${g.label} — ${g.hint}` : g.label}
+            >
+              {g.icon} {g.label}
+            </button>
+          ))}
+        </div>
+        <div className="controls" style={{ gap: 12 }}>
+          <button className="btn primary" onClick={recordAndAnalyze}>🎥 Analyze my bubble</button>
+          {report && (
+            <span className="small" style={{ alignSelf: 'center', color: 'var(--ink2)' }}>
+              read from {report.nFrames} frames · re-analyze after changing settings in Play
+            </span>
+          )}
+        </div>
+
+        {!plan && (
           <p className="small" style={{ color: 'var(--ink2)' }}>
-            Set up a scene (wind, launcher, film, spin…), then hit <strong>🎥 Record &amp; analyze</strong>.
+            Pick a goal and press <strong>Analyze my bubble</strong> — POP will fly it and rank the levers.
           </p>
         )}
-        {report && report.ok && (
-          <div className="stack">
-            <ul style={{ margin: '4px 0', paddingLeft: 20 }}>
-              {report.findings.map((f, i) => (
-                <li key={i} style={{ marginBottom: 4 }}>{f}</li>
-              ))}
-            </ul>
-            <div className="kv small">
-              <div className="label">Wind — recovered vs. set</div>
-              <div>
-                {report.windSpeedMs.toFixed(1)} m/s {report.windDirDeg === 0 ? '→' : '←'} vs.{' '}
-                <strong>{report.truth.windSpeed.toFixed(1)} m/s</strong> set
-              </div>
-              <div className="label">Launcher — recovered vs. set</div>
-              <div>
-                {report.launcher} vs. <strong>{report.truth.launcher === 'loop' ? 'string loop' : 'rigid wand'}</strong>{' '}
-                {report.launcherIsLoop === (report.truth.launcher === 'loop') ? '✓' : '✗'}
-              </div>
-              <div className="label">Film ringing — recovered vs. set</div>
-              <div>
-                {report.ringing ? `yes (~${report.ringHz.toFixed(1)} Hz)` : 'no'} vs.{' '}
-                <strong>{report.truth.film.toFixed(1)} µm film</strong>
-              </div>
-              <div className="label">Spin — recovered vs. set</div>
-              <div>
-                {report.spinning ? `${report.spinRate.toFixed(1)} rad/s` : 'none'} vs.{' '}
-                <strong>{report.truth.spin.toFixed(1)} rad/s</strong>{' '}
-                {report.spinning === report.truth.spin > 0.3 ? '✓' : ''}
-              </div>
-              <div className="label">Confidence</div>
-              <div>
-                {(report.confidence * 100).toFixed(0)}% ({report.nFrames} frames)
-              </div>
-            </div>
-            <div className="footer small" style={{ padding: 0, border: 'none' }}>
-              A single frame couldn't have told wind from sag from launcher from spin — but their
-              distinct <em>time signatures</em> (steady drift, curvature, a fading imprint, a rotating
-              tilt) pull them apart. That's POP's whole premise, run backwards.
-            </div>
 
-            {plan && (
-              <div className="card" style={{ margin: 0 }}>
-                <h4 style={{ marginTop: 0 }}>🎯 Coach — harder, better, faster, stronger</h4>
-                <p className="small" style={{ marginTop: 0 }}>Pick a goal and POP reads this bubble, then ranks the levers to get there.</p>
-                <div className="controls" style={{ gap: 8, borderTop: 'none', padding: 0, marginBottom: 12 }}>
-                  {GOALS.map((g) => (
-                    <button
-                      key={g.key}
-                      className={`btn small ${goal === g.key ? 'primary' : 'ghost'}`}
-                      onClick={() => setGoal(g.key)}
-                      title={g.hint ? `${g.label} — ${g.hint}` : g.label}
-                    >
-                      {g.icon} {g.label}
-                    </button>
-                  ))}
+        {plan && (
+          <div className="stack">
+            <div className="kv small">
+              <div className="label">{plan.goal.icon} {plan.goal.label}{plan.goal.hint ? ` (${plan.goal.hint})` : ''} — where it stands</div>
+              <div>
+                <div style={{ height: 8, borderRadius: 999, background: 'var(--line)', overflow: 'hidden', maxWidth: 240 }}>
+                  <div style={{ width: `${plan.score}%`, height: '100%', background: 'var(--accent)' }} />
                 </div>
-                <div className="kv small" style={{ marginBottom: 12 }}>
-                  <div className="label">{plan.goal.icon} {plan.goal.label}{plan.goal.hint ? ` (${plan.goal.hint})` : ''} — where it stands</div>
-                  <div>
-                    <div style={{ height: 8, borderRadius: 999, background: 'var(--line)', overflow: 'hidden', maxWidth: 240 }}>
-                      <div style={{ width: `${plan.score}%`, height: '100%', background: 'var(--accent)' }} />
-                    </div>
-                    <span className="small" style={{ color: 'var(--ink2)' }}>{plan.score}/100 · {plan.summary}</span>
-                  </div>
-                </div>
-                <ol style={{ margin: 0, paddingLeft: 20 }}>
-                  {plan.levers.map((l, i) => (
-                    <li key={i} style={{ marginBottom: 8 }}>
-                      <strong>{l.title}</strong>
-                      {l.control ? <span className="tag" style={{ marginLeft: 8 }}>{l.control}</span> : null}
-                      <div className="small" style={{ color: 'var(--ink2)', marginTop: 2 }}>{l.why}</div>
-                    </li>
-                  ))}
-                </ol>
-                {plan.caveat && (
-                  <p className="small" style={{ color: 'var(--warn)', marginBottom: 0 }}>⚠️ {plan.caveat}</p>
-                )}
-                <Drawer title="🔬 What POP doesn't model yet — the next hypotheses to add" className="">
-                  <ul className="small" style={{ margin: 0, paddingLeft: 20 }}>
-                    {MODEL_GAPS.map((h, i) => (
-                      <li key={i} style={{ marginBottom: 6 }}>{h}</li>
-                    ))}
-                  </ul>
-                </Drawer>
+                <span className="small" style={{ color: 'var(--ink2)' }}>{plan.score}/100 · {plan.summary}</span>
               </div>
+            </div>
+            <ol style={{ margin: 0, paddingLeft: 20 }}>
+              {plan.levers.map((l, i) => (
+                <li key={i} style={{ marginBottom: 8 }}>
+                  <strong>{l.title}</strong>
+                  {l.control ? <span className="tag" style={{ marginLeft: 8 }}>{l.control}</span> : null}
+                  <div className="small" style={{ color: 'var(--ink2)', marginTop: 2 }}>{l.why}</div>
+                </li>
+              ))}
+            </ol>
+            {plan.caveat && (
+              <p className="small" style={{ color: 'var(--warn)', marginBottom: 0 }}>⚠️ {plan.caveat}</p>
             )}
+
+            {report && report.ok && (
+              <Drawer title="🔎 How POP read this bubble backwards (recovered vs. set)">
+                <ul style={{ margin: '4px 0', paddingLeft: 20 }}>
+                  {report.findings.map((f, i) => (
+                    <li key={i} className="small" style={{ marginBottom: 4 }}>{f}</li>
+                  ))}
+                </ul>
+                <div className="kv small">
+                  <div className="label">Wind — recovered vs. set</div>
+                  <div>
+                    {report.windSpeedMs.toFixed(1)} m/s {report.windDirDeg === 0 ? '→' : '←'} vs.{' '}
+                    <strong>{report.truth.windSpeed.toFixed(1)} m/s</strong> set
+                  </div>
+                  <div className="label">Launcher — recovered vs. set</div>
+                  <div>
+                    {report.launcher} vs. <strong>{report.truth.launcher === 'loop' ? 'string loop' : 'rigid wand'}</strong>{' '}
+                    {report.launcherIsLoop === (report.truth.launcher === 'loop') ? '✓' : '✗'}
+                  </div>
+                  <div className="label">Film ringing — recovered vs. set</div>
+                  <div>
+                    {report.ringing ? `yes (~${report.ringHz.toFixed(1)} Hz)` : 'no'} vs.{' '}
+                    <strong>{report.truth.film.toFixed(1)} µm film</strong>
+                  </div>
+                  <div className="label">Spin — recovered vs. set</div>
+                  <div>
+                    {report.spinning ? `${report.spinRate.toFixed(1)} rad/s` : 'none'} vs.{' '}
+                    <strong>{report.truth.spin.toFixed(1)} rad/s</strong>{' '}
+                    {report.spinning === report.truth.spin > 0.3 ? '✓' : ''}
+                  </div>
+                  <div className="label">Confidence</div>
+                  <div>{(report.confidence * 100).toFixed(0)}% ({report.nFrames} frames)</div>
+                </div>
+                <div className="footer small" style={{ padding: 0, border: 'none' }}>
+                  A single frame couldn't have told wind from sag from launcher from spin — but their
+                  distinct <em>time signatures</em> pull them apart. That's POP's whole premise, run backwards.
+                </div>
+              </Drawer>
+            )}
+
+            <Drawer title="🔬 What POP doesn't model yet — the next hypotheses to add">
+              <ul className="small" style={{ margin: 0, paddingLeft: 20 }}>
+                {MODEL_GAPS.map((h, i) => (
+                  <li key={i} style={{ marginBottom: 6 }}>{h}</li>
+                ))}
+              </ul>
+            </Drawer>
           </div>
         )}
-      </div>
+      </>
+      )}
     </div>
   )
 })

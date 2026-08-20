@@ -12,25 +12,13 @@ const ReferencesModal = memo(function ReferencesModal({ onClose }) {
         <div className="modal-body">
           <div className="stack">
             <div className="card">
-              <h3>🫧 Live Physics — the forward model</h3>
+              <h3>🫧 Play — the forward model</h3>
               <div className="stack small">
                 <ul>
-                  <li>Hit <strong>Launch bubble</strong> and watch a real soft-body soap film deform, drift and pop in the wind.</li>
-                  <li>Choose a <strong>launcher</strong>: a compliant <em>string loop</em>, a <em>rigid wand</em>, or a <em>custom loop</em> you draw — the loop's shape becomes the bubble's.</li>
-                  <li>Dial <strong>wind, direction, gust and launch</strong> up top; open <strong>More parameters</strong> for gravity, film thickness, humidity, soap mix, wake and spin.</li>
-                  <li>Toggle <strong>2D / 3D</strong> to see the same physics as a shaded, refracting 3D bubble.</li>
+                  <li>Press a <strong>Scenario</strong> for an instant interesting bubble, or hit <strong>Launch</strong> and drag the <strong>Wind</strong> slider.</li>
+                  <li>Watch a real soft-body soap film deform, drift and pop — nothing is a pre-baked ellipse.</li>
+                  <li>Open the <strong>Fine-tune</strong> tray for the launcher (string loop, rigid wand, or a custom loop you draw), wind detail and 2D/3D; the <strong>Film, gravity, mix &amp; spin</strong> tray for the rest.</li>
                 </ul>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3>🎥 Record &amp; analyze — the inverse</h3>
-              <div className="stack small">
-                <p style={{ margin: 0 }}>
-                  Press <strong>Record &amp; analyze</strong> to fly a bubble and read the scene back out
-                  of its shape over time — wind, gravity, the launcher, the film's ring, any spin. A
-                  single frame is ambiguous; the time course pulls the causes apart.
-                </p>
               </div>
             </div>
 
@@ -38,15 +26,17 @@ const ReferencesModal = memo(function ReferencesModal({ onClose }) {
               <h3>🎯 Coach — harder, better, faster, stronger</h3>
               <div className="stack small">
                 <p style={{ margin: 0 }}>
-                  In the analysis, pick a goal — <strong>harder, better, faster, or stronger</strong> (the song: resists popping, bigger, quicker, longer flight) —
-                  and POP ranks concrete levers (loop size, surface tension, film, wind) with the physics
-                  behind each, plus the effects it doesn't model yet.
+                  Set the scene in <strong>Play</strong>, switch to <strong>Coach</strong>, and pick a goal —{' '}
+                  <strong>harder, better, faster, or stronger</strong> (the song: resists popping, bigger,
+                  quicker, longer flight). POP flies your bubble, scores it, and ranks concrete levers with
+                  the physics behind each. A tray shows it reading the bubble backwards (recovered vs. set),
+                  and another lists what POP doesn't model yet.
                 </p>
               </div>
             </div>
 
             <div className="card">
-              <h3>🔍 Analyzer — from a real photo or video</h3>
+              <h3>🔎 Analyze — from a real photo or video</h3>
               <div className="stack small">
                 <ol>
                   <li><strong>Upload</strong> a clear bubble photo or video.</li>
