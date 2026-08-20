@@ -61,11 +61,20 @@ const REFERENCES = [
   },
 ]
 
+const TABS = [
+  { key: 'play', icon: '🫧', label: 'Play', blurb: 'Watch a bubble in the wind' },
+  { key: 'coach', icon: '🎯', label: 'Coach', blurb: 'Make it harder · better · faster · stronger' },
+  { key: 'analyze', icon: '🔎', label: 'Analyze', blurb: 'A photo or video → wind & wand' },
+  { key: 'learn', icon: '📖', label: 'Learn', blurb: 'How POP works' },
+]
+
 export default function App() {
   const [refsOpen, setRefsOpen] = useState(false)
+  const [tab, setTab] = useState('play')
 
   const openRefs = useCallback(() => setRefsOpen(true), [])
   const closeRefs = useCallback(() => setRefsOpen(false), [])
+  const activeTab = TABS.find((t) => t.key === tab) || TABS[0]
 
   return (
     <>
@@ -83,37 +92,54 @@ export default function App() {
         </div>
       </header>
       <main>
+        <nav className="tabbar" aria-label="Workflow">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              className={`tab ${tab === t.key ? 'active' : ''}`}
+              onClick={() => setTab(t.key)}
+              aria-current={tab === t.key}
+            >
+              <span className="tab-ico" aria-hidden="true">{t.icon}</span>
+              <span className="tab-label">{t.label}</span>
+            </button>
+          ))}
+        </nav>
+        <p className="tab-blurb small">{activeTab.icon} {activeTab.blurb}</p>
+
         <div className="grid">
-          <Card className="span-2" title="🫧 Live Physics: watch a bubble deform in the wind">
-            <BubblePhysics />
+          <Card
+            className="span-2"
+            hidden={tab !== 'play' && tab !== 'coach'}
+            title={tab === 'coach' ? '🎯 Coach — make it harder, better, faster, stronger' : '🫧 Play — watch a bubble deform in the wind'}
+          >
+            <BubblePhysics tab={tab === 'coach' ? 'coach' : 'play'} active={tab === 'play'} />
           </Card>
 
-          <Card title="🔍 Inverse: Photo / Video → Wind & Wand">
+          <Card className="span-2" hidden={tab !== 'analyze'} title="🔎 Analyze — a photo or video → wind & wand">
             <Analyzer />
+            <Drawer title="⚙️ Model constants (χ ↔ We ↔ U) — calibration">
+              <CorrelationPanel />
+              <div className="footer small">
+                These constants feed the axis‑ratio → Weber and Weber → wind
+                mapping. Adjust them to match your own calibration.
+              </div>
+            </Drawer>
           </Card>
 
-          <Card title="⚙️ Model parameters (χ ↔ We ↔ U)">
-            <CorrelationPanel />
-            <div className="footer small">
-              These constants feed the axis‑ratio → Weber and Weber → wind
-              mapping. Adjust them to match your own calibration.
-            </div>
-          </Card>
-
-          <Card title="ℹ️ About POP">
+          <Card className="span-2" hidden={tab !== 'learn'} title="📖 Learn — how POP works">
             <div className="stack">
               <p>
                 POP answers one question — <strong>can a bubble's shape reveal the wind and how the
-                wand was held?</strong> — by simulating it both ways. The <strong>Live Physics</strong>{' '}
-                panel runs a real soft-body soap film (surface tension, internal pressure, an
-                aerodynamic wind, gravity sag, spin and a choice of launcher), measures the emergent
-                shape, and infers the conditions back from it — including from a whole recorded series.
+                wand was held?</strong> — by simulating it both ways: a real soft-body soap film
+                (surface tension, internal pressure, an aerodynamic wind, gravity sag, film lifetime,
+                spin and a choice of launcher) whose emergent shape POP can also read backwards.
               </p>
-              <p><strong>What you can do here:</strong></p>
+              <p><strong>Three simple workflows:</strong></p>
               <ul>
-                <li><strong>Live Physics:</strong> play the forward model, then hit <em>Record &amp; analyze</em> to run it in reverse.</li>
-                <li><strong>Analyzer:</strong> fit an ellipse to a real photo or video and read out wind &amp; wand.</li>
-                <li><strong>Custom loop:</strong> design your own wand in Live Physics — its shape becomes the bubble's.</li>
+                <li><strong>🫧 Play</strong> — fly a bubble; one-click Scenarios set the scene, and the trays hold every fine control.</li>
+                <li><strong>🎯 Coach</strong> — pick a goal and POP flies your bubble, scores it, and ranks concrete levers.</li>
+                <li><strong>🔎 Analyze</strong> — fit an ellipse to a real photo or video and read out the wind &amp; wand.</li>
               </ul>
               <p className="small">
                 POP is a teaching tool built on literature‑inspired heuristics (deformation ↔ Weber
@@ -122,24 +148,25 @@ export default function App() {
               </p>
               <button className="btn" onClick={openRefs}>📖 How-to guide</button>
             </div>
-          </Card>
 
-          <Card className="span-2" title="📚 Scientific References & Citations">
-            <p className="small" style={{ marginTop: 0 }}>
-              The literature POP's heuristics are built on. Expand any entry for a plain-English
-              summary and the paper link.
-            </p>
-            {REFERENCES.map((r) => (
-              <Drawer key={r.url} title={r.title}>
-                <div className="stack small">
-                  <p style={{ margin: 0 }}>{r.who}</p>
-                  <p style={{ margin: 0 }}>{r.summary}</p>
-                  <a href={r.url} target="_blank" rel="noopener" className="btn small" style={{ alignSelf: 'flex-start' }}>
-                    🔗 View source
-                  </a>
-                </div>
-              </Drawer>
-            ))}
+            <div style={{ marginTop: 18 }}>
+              <h3 style={{ margin: '0 0 6px' }}>📚 Scientific references</h3>
+              <p className="small" style={{ marginTop: 0 }}>
+                The literature POP's heuristics are built on. Expand any entry for a plain-English
+                summary and the paper link.
+              </p>
+              {REFERENCES.map((r) => (
+                <Drawer key={r.url} title={r.title}>
+                  <div className="stack small">
+                    <p style={{ margin: 0 }}>{r.who}</p>
+                    <p style={{ margin: 0 }}>{r.summary}</p>
+                    <a href={r.url} target="_blank" rel="noopener" className="btn small" style={{ alignSelf: 'flex-start' }}>
+                      🔗 View source
+                    </a>
+                  </div>
+                </Drawer>
+              ))}
+            </div>
           </Card>
         </div>
       </main>
